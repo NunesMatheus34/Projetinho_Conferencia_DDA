@@ -1,0 +1,141 @@
+/* ===================================================================
+   ESTILOS DA PÁGINA (a aparência)
+   Aqui ficam cores, tamanhos, espaçamentos e layout.
+   =================================================================== */
+
+/* :root guarda as cores que uso em vários lugares, com um "apelido".
+   Assim, se eu quiser trocar o verde, mudo só aqui num lugar. */
+:root{
+  --tinta:#12283a;        /* azul-tinta escuro, cor de carimbo */
+  --papel:#f3efe6;        /* fundo cor de papel de razão contábil */
+  --linha:#d9d2c3;        /* cor das bordas/linhas */
+  --verde:#1f6b4a;        /* conferido */
+  --verde-bg:#e4efe8;
+  --ambar:#9a6a12;        /* nome divergente / factoring */
+  --ambar-bg:#f6ecd6;
+  --vermelho:#a5341f;     /* faltando */
+  --vermelho-bg:#f3e2dc;
+  --azul:#1f4e8c;         /* data divergente */
+  --azul-bg:#dfe7f3;
+  --tinta-fraca:#5c6b78;  /* texto secundário, mais claro */
+}
+
+/* zera margens/paddings padrão do navegador pra tudo começar igual */
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  font-family:"Segoe UI",system-ui,sans-serif;
+  background:var(--papel);
+  color:var(--tinta);
+  line-height:1.5;
+  padding:0 0 80px;
+}
+
+/* ---------- Cabeçalho ---------- */
+header{
+  border-bottom:3px double var(--tinta);
+  padding:32px 24px 20px;
+  max-width:1100px;margin:0 auto;
+}
+.eyebrow{
+  font-size:12px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--tinta-fraca);font-weight:600;
+}
+h1{
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:38px;font-weight:700;letter-spacing:-.5px;margin-top:4px;
+}
+header p{color:var(--tinta-fraca);margin-top:8px;max-width:620px;font-size:15px}
+
+main{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* ---------- Caixas de upload ---------- */
+.uploads{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:28px}
+/* em telas pequenas (celular), vira uma coluna só */
+@media(max-width:640px){.uploads{grid-template-columns:1fr}}
+
+.card{
+  background:#fff;border:1px solid var(--linha);border-radius:8px;
+  padding:20px;position:relative;
+}
+.card .num{
+  font-family:Georgia,serif;font-size:13px;color:var(--tinta-fraca);
+  letter-spacing:2px;text-transform:uppercase;font-weight:700;
+}
+.card h2{font-size:18px;margin:6px 0 4px}
+.card .hint{font-size:13px;color:var(--tinta-fraca);margin-bottom:14px}
+
+/* a área tracejada onde se clica/arrasta o arquivo */
+.drop{
+  border:2px dashed var(--linha);border-radius:6px;padding:22px 14px;
+  text-align:center;cursor:pointer;transition:.15s;background:var(--papel)
+}
+.drop:hover,.drop.over{border-color:var(--tinta);background:#fff}
+.drop input{display:none}
+.drop .ico{font-size:26px}
+.drop .txt{font-size:14px;margin-top:6px;color:var(--tinta-fraca)}
+/* quando um arquivo foi carregado, fica verde */
+.drop.ok{border-color:var(--verde);background:var(--verde-bg)}
+.drop.ok .txt{color:var(--verde);font-weight:600}
+
+/* ---------- Botões ---------- */
+.actions{margin-top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button{
+  font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
+  border:none;border-radius:6px;padding:12px 26px;transition:.15s;
+}
+.btn-go{background:var(--tinta);color:var(--papel)}
+.btn-go:hover{background:#1d3a52}
+.btn-go:disabled{opacity:.4;cursor:not-allowed}  /* cinza enquanto faltar arquivo */
+.btn-sec{background:transparent;color:var(--tinta);border:1px solid var(--linha)}
+.btn-sec:hover{border-color:var(--tinta)}
+
+/* ---------- Resumo (os 5 números) ---------- */
+.resumo{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:34px}
+@media(max-width:900px){.resumo{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:640px){.resumo{grid-template-columns:1fr 1fr}}
+.stat{background:#fff;border:1px solid var(--linha);border-radius:8px;padding:16px;border-left:5px solid var(--tinta)}
+.stat.ok{border-left-color:var(--verde)}
+.stat.div{border-left-color:var(--ambar)}
+.stat.data{border-left-color:var(--azul)}
+.stat.b{border-left-color:var(--vermelho)}
+.stat.s{border-left-color:var(--vermelho)}
+.stat .n{font-family:Georgia,serif;font-size:32px;font-weight:700}
+.stat .l{font-size:12px;color:var(--tinta-fraca);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+
+/* ---------- Blocos de resultado ---------- */
+section.bloco{margin-top:34px}
+.bloco h3{
+  font-family:Georgia,serif;font-size:20px;padding-bottom:8px;
+  border-bottom:2px solid var(--tinta);display:flex;align-items:center;gap:10px
+}
+/* as etiquetas coloridas ao lado dos títulos */
+.tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.5px}
+.tag.ok{background:var(--verde-bg);color:var(--verde)}
+.tag.div{background:var(--ambar-bg);color:var(--ambar)}
+.tag.falta{background:var(--vermelho-bg);color:var(--vermelho)}
+.tag.data{background:var(--azul-bg);color:var(--azul)}
+
+.motivo{color:var(--ambar);font-size:13px}
+
+/* ---------- Tabelas ---------- */
+table{width:100%;border-collapse:collapse;margin-top:12px;background:#fff;font-size:14px}
+th{
+  text-align:left;padding:10px 12px;border-bottom:2px solid var(--linha);
+  font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--tinta-fraca)
+}
+td{padding:10px 12px;border-bottom:1px solid var(--linha)}
+tr:last-child td{border-bottom:none}
+.val{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap} /* números alinhados */
+.row-div{background:var(--ambar-bg)}  /* destaca a linha do nome divergente */
+.row-data{background:var(--azul-bg)}  /* destaca a linha da data divergente */
+.arrow{color:var(--tinta-fraca);padding:0 6px}
+.vazio{color:var(--tinta-fraca);font-style:italic;padding:14px 12px;font-size:14px}
+
+/* ---------- Mensagem de erro ---------- */
+#erro{background:var(--vermelho-bg);color:var(--vermelho);border:1px solid var(--vermelho);
+  border-radius:6px;padding:14px 16px;margin-top:20px;font-size:14px;display:none}
+
+/* o resultado começa escondido; o JavaScript mostra depois de conferir */
+#resultado{display:none}
+.oculto{display:none}

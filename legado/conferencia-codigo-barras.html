@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conferência de Código de Barras</title>
+
+<!-- SheetJS: lê o Excel enviado pelo usuário -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+        integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<!-- ExcelJS: gera o Excel de resultado já formatado -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"
+        integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<style>
+:root{
+  --tinta:#12283a;
+  --papel:#f3efe6;
+  --linha:#d9d2c3;
+  --verde:#1f6b4a;
+  --verde-bg:#e4efe8;
+  --ambar:#9a6a12;
+  --ambar-bg:#f6ecd6;
+  --vermelho:#a5341f;
+  --vermelho-bg:#f3e2dc;
+  --azul:#1f4e8c;
+  --azul-bg:#dfe7f3;
+  --tinta-fraca:#5c6b78;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Segoe UI",system-ui,sans-serif;
+  background:var(--papel);
+  color:var(--tinta);
+  line-height:1.5;
+  padding:0 0 80px;
+}
+header{
+  border-bottom:3px double var(--tinta);
+  padding:32px 24px 20px;
+  max-width:1200px;margin:0 auto;
+}
+.eyebrow{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--tinta-fraca);font-weight:600}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:36px;font-weight:700;letter-spacing:-.5px;margin-top:4px}
+header p{color:var(--tinta-fraca);margin-top:8px;max-width:680px;font-size:15px}
+
+main{max-width:1200px;margin:0 auto;padding:0 24px}
+
+.card{background:#fff;border:1px solid var(--linha);border-radius:8px;padding:20px;margin-top:28px;max-width:520px}
+.card .num{font-family:Georgia,serif;font-size:13px;color:var(--tinta-fraca);letter-spacing:2px;text-transform:uppercase;font-weight:700}
+.card h2{font-size:18px;margin:6px 0 4px}
+.card .hint{font-size:13px;color:var(--tinta-fraca);margin-bottom:14px}
+
+.drop{border:2px dashed var(--linha);border-radius:6px;padding:26px 14px;text-align:center;cursor:pointer;transition:.15s;background:var(--papel)}
+.drop:hover,.drop.over{border-color:var(--tinta);background:#fff}
+.drop input{display:none}
+.drop .ico{font-size:26px}
+.drop .txt{font-size:14px;margin-top:6px;color:var(--tinta-fraca)}
+.drop.ok{border-color:var(--verde);background:var(--verde-bg)}
+.drop.ok .txt{color:var(--verde);font-weight:600}
+
+.actions{margin-top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button{font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;border:none;border-radius:6px;padding:12px 26px;transition:.15s}
+.btn-go{background:var(--tinta);color:var(--papel)}
+.btn-go:hover{background:#1d3a52}
+.btn-go:disabled{opacity:.4;cursor:not-allowed}
+.btn-sec{background:transparent;color:var(--tinta);border:1px solid var(--linha)}
+.btn-sec:hover{border-color:var(--tinta)}
+
+.resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:34px}
+@media(max-width:760px){.resumo{grid-template-columns:1fr 1fr}}
+.stat{background:#fff;border:1px solid var(--linha);border-radius:8px;padding:16px;border-left:5px solid var(--tinta)}
+.stat.div{border-left-color:var(--ambar)}
+.stat.dup{border-left-color:var(--vermelho)}
+.stat.ok{border-left-color:var(--verde)}
+.stat .n{font-family:Georgia,serif;font-size:32px;font-weight:700}
+.stat .l{font-size:12px;color:var(--tinta-fraca);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+
+section.bloco{margin-top:34px}
+.bloco h3{font-family:Georgia,serif;font-size:20px;padding-bottom:8px;border-bottom:2px solid var(--tinta);display:flex;align-items:center;gap:10px}
+.tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.5px}
+.tag.div{background:var(--ambar-bg);color:var(--ambar)}
+.tag.dup{background:var(--vermelho-bg);color:var(--vermelho)}
+
+table{width:100%;border-collapse:collapse;margin-top:12px;background:#fff;font-size:14px}
+th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--linha);font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--tinta-fraca)}
+td{padding:10px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.val{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.cod{font-family:"Consolas","Courier New",monospace;font-size:12px;word-break:break-all;letter-spacing:.2px;color:var(--tinta-fraca);max-width:220px}
+.diff{color:var(--vermelho)}
+.row-div{background:var(--ambar-bg)}
+.grupo-inicio td{border-top:2px solid var(--tinta)}
+.vazio{color:var(--tinta-fraca);font-style:italic;padding:14px 12px;font-size:14px}
+
+#erro{background:var(--vermelho-bg);color:var(--vermelho);border:1px solid var(--vermelho);border-radius:6px;padding:14px 16px;margin-top:20px;font-size:14px;display:none}
+
+#resultado{display:none}
+.oculto{display:none}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="eyebrow">Contas a Pagar · Conciliação</div>
+  <h1>Conferência de Código de Barras</h1>
+  <p>Suba o relatório de títulos a pagar do sistema e a página compara o valor lido em cada código de barras (linha digitável) com o saldo lançado, além de apontar códigos repetidos em mais de um título.</p>
+</header>
+
+<main>
+  <div class="card">
+    <div class="num">Arquivo</div>
+    <h2>Títulos a Pagar</h2>
+    <div class="hint">O cabeçalho é detectado automaticamente (linha com "Código de Barras" e "Saldo").</div>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".xlsx,.xls">
+      <div class="ico">📋</div>
+      <div class="txt" id="txt">Clique ou arraste o arquivo de títulos a pagar</div>
+    </label>
+  </div>
+
+  <div class="actions">
+    <button class="btn-go" id="btnGo" disabled>Conferir</button>
+    <button class="btn-sec oculto" id="btnXlsx">Baixar resultado (Excel)</button>
+    <button class="btn-sec oculto" id="btnReset">Nova conferência</button>
+  </div>
+
+  <div id="erro"></div>
+
+  <div id="resultado">
+    <div class="resumo">
+      <div class="stat">
+        <div class="n" id="nTotal">0</div>
+        <div class="l">Títulos com código</div>
+      </div>
+      <div class="stat div">
+        <div class="n" id="nDiv">0</div>
+        <div class="l">Divergências</div>
+      </div>
+      <div class="stat dup">
+        <div class="n" id="nDup">0</div>
+        <div class="l">Duplicados</div>
+      </div>
+      <div class="stat ok">
+        <div class="n" id="nOk">0</div>
+        <div class="l">Conferidos OK</div>
+      </div>
+    </div>
+
+    <section class="bloco">
+      <h3>Divergências de valor <span class="tag div">código ≠ saldo lançado</span></h3>
+      <div id="tblDiv"></div>
+    </section>
+
+    <section class="bloco">
+      <h3>Códigos duplicados <span class="tag dup">mesmo código em mais de um título</span></h3>
+      <div id="tblDup"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ===================================================================
+   FUNÇÕES AUXILIARES
+   =================================================================== */
+
+const brl = n => (n===null || n===undefined || isNaN(n)) ? '—' : n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+// maiúsculo, sem acento, sem espaço nas pontas — pra comparar cabeçalhos
+function normaliza(s){
+  if(s===null || s===undefined) return '';
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
+// transforma qualquer valor (texto ou número) num número limpo com 2 casas
+function paraNumero(v){
+  if(v===null || v===undefined || v==='') return null;
+  if(typeof v==='number') return Math.round(v*100)/100;
+  let s = String(v).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.');
+  let n = parseFloat(s);
+  return isNaN(n) ? null : Math.round(n*100)/100;
+}
+
+// formata a data como dd/mm/aaaa, venha ela como texto ou como data
+function formatData(v){
+  if(v===null || v===undefined || v==='') return '';
+  if(v instanceof Date){
+    const d = String(v.getDate()).padStart(2,'0');
+    const m = String(v.getMonth()+1).padStart(2,'0');
+    return `${d}/${m}/${v.getFullYear()}`;
+  }
+  return String(v).trim();
+}
+
+// deixa só os dígitos de um código de barras (tira ponto, espaço, etc.)
+function apenasDigitos(v){
+  if(v===null || v===undefined) return '';
+  return String(v).replace(/\D+/g,'');
+}
+
+// linha digitável de boleto: o valor são os ÚLTIMOS 10 dígitos, em centavos
+function valorDoCodigoBarras(digitos){
+  const ult10 = digitos.slice(-10);
+  const n = parseInt(ult10,10);
+  return isNaN(n) ? null : Math.round(n)/100;
+}
+
+function escapa(s){
+  return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+
+/* -------------------------------------------------------------------
+   LER O EXCEL
+   ------------------------------------------------------------------- */
+
+function lerMatriz(file){
+  return new Promise((res,rej)=>{
+    const fr = new FileReader();
+    fr.onload = e => {
+      try{
+        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        res(XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null}));
+      }catch(err){ rej(err); }
+    };
+    fr.onerror = () => rej(new Error('Não consegui ler o arquivo.'));
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+// procura a linha que tem, ao mesmo tempo, uma célula com "CÓDIGO DE BARRAS"
+// (o subtítulo do relatório só tem "Cód. Barras" abreviado, então exigir a
+// palavra completa "CODIGO" evita pegar essa linha errada) e uma com "SALDO".
+function acharCabecalho(m){
+  for(let i=0;i<m.length;i++){
+    const linha = m[i] || [];
+    let temCodBarras = false, temSaldo = false;
+    linha.forEach(cel=>{
+      const n = normaliza(cel);
+      if(n.includes('CODIGO') && n.includes('BARRA')) temCodBarras = true;
+      if(n.includes('SALDO')) temSaldo = true;
+    });
+    if(temCodBarras && temSaldo) return i;
+  }
+  return -1;
+}
+
+// mapeia as colunas pelo texto do cabeçalho; usa fallback fixo se não achar
+function mapeiaColunas(linhaCab){
+  const cols = { venc:-1, cliente:-1, nome:-1, duplicata:-1, barra:-1, saldo:-1 };
+  (linhaCab || []).forEach((cel,i)=>{
+    const n = normaliza(cel);
+    if(cols.barra<0     && n.includes('BARRA'))     cols.barra = i;
+    if(cols.saldo<0      && n.includes('SALDO'))      cols.saldo = i;
+    if(cols.venc<0        && n.includes('VENC'))        cols.venc = i;
+    if(cols.duplicata<0 && n.includes('DUPLICATA')) cols.duplicata = i;
+    if(cols.cliente<0    && n.includes('CLIENTE'))    cols.cliente = i;
+  });
+  cols.nome = cols.cliente>=0 ? cols.cliente+1 : -1;
+
+  // fallback fixo: A=Vencto, B=Cliente, C=Nome, D=Duplicata, K=Código de barras, L=Saldo
+  if(cols.venc<0)       cols.venc = 0;
+  if(cols.nome<0)       cols.nome = 2;
+  if(cols.duplicata<0)  cols.duplicata = 3;
+  if(cols.barra<0)      cols.barra = 10;
+  if(cols.saldo<0)       cols.saldo = 11;
+  return cols;
+}
+
+// extrai os títulos com código de barras válido (>=40 dígitos) e saldo numérico
+function extraiTitulos(m, cols, headerIdx){
+  const out = [];
+  for(let i=headerIdx+1; i<m.length; i++){
+    const linha = m[i] || [];
+    const saldo = paraNumero(linha[cols.saldo]);
+    if(saldo===null) continue;
+    const digitos = apenasDigitos(linha[cols.barra]);
+    if(digitos.length<40) continue;
+    out.push({
+      venc: formatData(linha[cols.venc]),
+      nome: linha[cols.nome]!=null ? String(linha[cols.nome]).trim() : '',
+      duplicata: linha[cols.duplicata]!=null ? String(linha[cols.duplicata]).trim() : '',
+      codigo: digitos,
+      valorCodigo: valorDoCodigoBarras(digitos),
+      saldo,
+    });
+  }
+  return out;
+}
+
+
+/* -------------------------------------------------------------------
+   AS DUAS CONFERÊNCIAS
+   ------------------------------------------------------------------- */
+
+// divergências: |valor no código - saldo lançado| >= 0,005
+function achaDivergencias(titulos){
+  return titulos
+    .map(t => ({ ...t, diff: Math.round((t.valorCodigo - t.saldo)*100)/100 }))
+    .filter(t => Math.abs(t.diff) >= 0.005)
+    .sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+}
+
+// duplicados: mesmo código de barras em mais de um título. Devolve uma
+// lista de GRUPOS (cada grupo é uma lista de títulos com o mesmo código).
+function achaDuplicados(titulos){
+  const porCodigo = new Map();
+  titulos.forEach(t => {
+    if(!porCodigo.has(t.codigo)) porCodigo.set(t.codigo, []);
+    porCodigo.get(t.codigo).push(t);
+  });
+  const grupos = [];
+  porCodigo.forEach(lista => { if(lista.length>1) grupos.push(lista); });
+  return grupos;
+}
+
+
+/* -------------------------------------------------------------------
+   MONTAR AS TABELAS NA TELA
+   ------------------------------------------------------------------- */
+
+function tabelaDivergencias(dados){
+  if(!dados.length) return '<p class="vazio">Nenhuma divergência de valor encontrada — tudo certo aqui.</p>';
+  let h = '<table><thead><tr><th>Vencto.</th><th>Nome</th><th>Duplicata</th><th>Código de barras</th><th>Valor no código</th><th>Saldo lançado</th><th>Diferença</th></tr></thead><tbody>';
+  dados.forEach(t => {
+    const sinal = t.diff>=0 ? '+' : '';
+    h += `<tr class="row-div">
+      <td class="val">${escapa(t.venc)}</td>
+      <td>${escapa(t.nome)}</td>
+      <td>${escapa(t.duplicata)}</td>
+      <td class="cod">${escapa(t.codigo)}</td>
+      <td class="val">${brl(t.valorCodigo)}</td>
+      <td class="val">${brl(t.saldo)}</td>
+      <td class="val diff">${sinal}${brl(t.diff)}</td></tr>`;
+  });
+  return h + '</tbody></table>';
+}
+
+function tabelaDuplicados(grupos){
+  if(!grupos.length) return '<p class="vazio">Nenhum código duplicado encontrado — tudo certo aqui.</p>';
+  let h = '<table><thead><tr><th>Grupo</th><th>Vencto.</th><th>Nome</th><th>Duplicata</th><th>Código de barras</th><th>Saldo lançado</th></tr></thead><tbody>';
+  grupos.forEach((lista,gi) => {
+    lista.forEach((t,ti) => {
+      h += `<tr class="${ti===0 && gi>0 ? 'grupo-inicio' : ''}">`;
+      if(ti===0) h += `<td class="val" rowspan="${lista.length}">Grupo ${gi+1}</td>`;
+      h += `<td class="val">${escapa(t.venc)}</td>
+        <td>${escapa(t.nome)}</td>
+        <td>${escapa(t.duplicata)}</td>
+        <td class="cod">${escapa(t.codigo)}</td>
+        <td class="val">${brl(t.saldo)}</td></tr>`;
+    });
+  });
+  return h + '</tbody></table>';
+}
+
+
+/* -------------------------------------------------------------------
+   LIGAR TUDO: upload, botão Conferir, exportar Excel
+   ------------------------------------------------------------------- */
+
+let arquivo = null, ultimo = null;
+
+const drop = document.getElementById('drop');
+const inp  = document.getElementById('file');
+const txt  = document.getElementById('txt');
+
+inp.addEventListener('change', () => { if(inp.files[0]) aceita(inp.files[0]); });
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if(f){ inp.files = e.dataTransfer.files; aceita(f); }
+});
+function aceita(f){
+  drop.classList.add('ok');
+  txt.textContent = '✓ ' + f.name;
+  arquivo = f;
+  document.getElementById('btnGo').disabled = false;
+}
+
+function mostraErro(msg){ const e=document.getElementById('erro'); e.textContent='⚠ '+msg; e.style.display='block'; }
+function limpaErro(){ document.getElementById('erro').style.display='none'; }
+
+document.getElementById('btnGo').addEventListener('click', async () => {
+  limpaErro();
+  try{
+    const m = await lerMatriz(arquivo);
+
+    const headerIdx = acharCabecalho(m);
+    if(headerIdx<0) throw new Error('Não encontrei a linha de cabeçalho (preciso de uma linha com "Código de Barras" e "Saldo" juntos).');
+
+    const cols = mapeiaColunas(m[headerIdx]);
+    const titulos = extraiTitulos(m, cols, headerIdx);
+    if(!titulos.length) throw new Error('Não encontrei títulos com código de barras válido (40+ dígitos) e saldo numérico.');
+
+    const divergencias = achaDivergencias(titulos);
+    const duplicados = achaDuplicados(titulos);
+    const qtdDuplicados = duplicados.reduce((n,g) => n+g.length, 0);
+
+    ultimo = { titulos, divergencias, duplicados };
+
+    document.getElementById('nTotal').textContent = titulos.length;
+    document.getElementById('nDiv').textContent    = divergencias.length;
+    document.getElementById('nDup').textContent    = qtdDuplicados;
+    document.getElementById('nOk').textContent     = titulos.length - divergencias.length;
+
+    document.getElementById('tblDiv').innerHTML = tabelaDivergencias(divergencias);
+    document.getElementById('tblDup').innerHTML = tabelaDuplicados(duplicados);
+
+    document.getElementById('resultado').style.display = 'block';
+    document.getElementById('btnXlsx').classList.remove('oculto');
+    document.getElementById('btnReset').classList.remove('oculto');
+    document.getElementById('resultado').scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(err){
+    mostraErro(err.message || 'Erro ao processar o arquivo.');
+  }
+});
+
+document.getElementById('btnReset').addEventListener('click', () => location.reload());
+
+
+/* -------------------------------------------------------------------
+   EXPORTAR EXCEL (ExcelJS)
+   ------------------------------------------------------------------- */
+
+const BORDA_FINA = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+const AZUL_CAB = 'FF1F4E8C';
+const BRANCO = 'FFFFFFFF';
+
+function montaAba(wb, nome, colunas, linhas){
+  const ws = wb.addWorksheet(nome);
+  ws.columns = colunas;
+  ws.views = [{ state:'frozen', ySplit:1 }];
+
+  const cab = ws.getRow(1);
+  cab.eachCell(c => {
+    c.font = { bold:true, color:{argb:BRANCO} };
+    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:AZUL_CAB} };
+    c.alignment = { vertical:'middle', horizontal:'center' };
+    c.border = BORDA_FINA;
+  });
+  cab.height = 20;
+
+  if(!linhas.length){
+    ws.mergeCells(2,1,2,colunas.length);
+    ws.getCell(2,1).value = 'Nenhum registro nesta categoria.';
+    ws.getCell(2,1).font = { italic:true, color:{argb:'FF5C6B78'} };
+    return ws;
+  }
+
+  linhas.forEach(obj => {
+    const r = ws.addRow(obj);
+    r.eachCell({ includeEmpty:true }, c => { c.border = BORDA_FINA; });
+  });
+
+  colunas.forEach(c => {
+    if(c.fmt){
+      const col = ws.getColumn(c.key);
+      col.numFmt = c.fmt;
+      col.alignment = { horizontal:'right' };
+    }
+  });
+
+  return ws;
+}
+
+document.getElementById('btnXlsx').addEventListener('click', async () => {
+  if(!ultimo) return;
+
+  const wb = new ExcelJS.Workbook();
+
+  const COLS_DIV = [
+    { header:'Vencto.',           key:'venc',        width:14 },
+    { header:'Nome',              key:'nome',         width:40 },
+    { header:'Duplicata',         key:'duplicata',   width:16 },
+    { header:'Código de barras',  key:'codigo',        width:50 },
+    { header:'Valor no código',   key:'valorCodigo', width:18, fmt:'R$ #,##0.00' },
+    { header:'Saldo lançado',     key:'saldo',        width:18, fmt:'R$ #,##0.00' },
+    { header:'Diferença',         key:'diff',          width:16, fmt:'R$ #,##0.00' },
+  ];
+  const COLS_DUP = [
+    { header:'Grupo',             key:'grupo',        width:10 },
+    { header:'Vencto.',           key:'venc',           width:14 },
+    { header:'Nome',              key:'nome',            width:40 },
+    { header:'Duplicata',         key:'duplicata',      width:16 },
+    { header:'Código de barras',  key:'codigo',           width:50 },
+    { header:'Saldo lançado',     key:'saldo',           width:18, fmt:'R$ #,##0.00' },
+  ];
+
+  montaAba(wb, 'Divergências de Valor', COLS_DIV, ultimo.divergencias);
+
+  const linhasDup = ultimo.duplicados.flatMap((lista,gi) =>
+    lista.map(t => ({ ...t, grupo: gi+1 })));
+  montaAba(wb, 'Códigos Duplicados', COLS_DUP, linhasDup);
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Conferencia_Codigo_Barras.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+
+</body>
+</html>
