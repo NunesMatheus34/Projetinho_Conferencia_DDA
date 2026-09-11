@@ -156,6 +156,7 @@ th{
 td{padding:10px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
 tr:last-child td{border-bottom:none}
 .val{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.tol{color:var(--ambar);cursor:help;font-weight:700}
 .cod{font-family:"Consolas","Courier New",monospace;font-size:12px;word-break:break-all;letter-spacing:.2px;color:var(--tinta-fraca);max-width:220px}
 .diff{color:var(--vermelho)}
 .row-div{background:var(--ambar-bg)}
@@ -338,10 +339,12 @@ tr:last-child td{border-bottom:none}
    0) NAVEGAÇÃO ENTRE ABAS
    =================================================================== */
 
+const $ = id => document.getElementById(id);
+
 function mostraPainel(nome){
   document.querySelectorAll('.painel').forEach(p => p.classList.add('oculto'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
-  const painel = document.getElementById('painel-' + nome);
+  const painel = $('painel-' + nome);
   const btn = document.querySelector(`.tab-btn[data-tab="${nome}"]`);
   if(painel) painel.classList.remove('oculto');
   if(btn) btn.classList.add('ativo');
@@ -406,9 +409,9 @@ function lerMatriz(file){
 
 // prepara uma caixa de upload (clicar OU arrastar arquivo)
 function ligaDrop(dropId, inputId, txtId, onFile){
-  const drop = document.getElementById(dropId);
-  const inp  = document.getElementById(inputId);
-  const txt  = document.getElementById(txtId);
+  const drop = $(dropId);
+  const inp  = $(inputId);
+  const txt  = $(txtId);
 
   inp.addEventListener('change', () => { if(inp.files[0]) aceita(inp.files[0]); });
 
@@ -428,8 +431,8 @@ function ligaDrop(dropId, inputId, txtId, onFile){
   }
 }
 
-function mostraErro(id, msg){ const e=document.getElementById(id); e.textContent='⚠ '+msg; e.style.display='block'; }
-function limpaErro(id){ document.getElementById(id).style.display='none'; }
+function mostraErro(id, msg){ const e=$(id); e.textContent='⚠ '+msg; e.style.display='block'; }
+function limpaErro(id){ $(id).style.display='none'; }
 
 const BORDA_FINA = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
 
@@ -502,31 +505,74 @@ function extraiSistema(m){
   return out;
 }
 
+// diferença de até 1 centavo ainda é considerada "mesmo valor" (evita falso
+// "não bateu" por arredondamento entre o boleto e o lançamento no sistema)
+const TOLERANCIA_VALOR = 0.01;
+function valoresBatem(a, b){
+  return Math.abs(a - b) <= TOLERANCIA_VALOR + 1e-9;
+}
+
+// agrupa os índices de "sis" por valor em centavos, pra achar candidatos a
+// parear sem varrer a lista inteira a cada título do banco (O(1) em vez de O(m))
+function indexaPorValor(sis){
+  const idx = new Map();
+  sis.forEach((s,i) => {
+    const c = Math.round(s.valor*100);
+    if(!idx.has(c)) idx.set(c, []);
+    idx.get(c).push(i);
+  });
+  return idx;
+}
+
+// devolve os índices de "sis" cujo valor está dentro da TOLERANCIA_VALOR,
+// na mesma ordem em que apareceriam numa varredura completa (índice crescente)
+function candidatosPorValor(idx, valor){
+  const centro = Math.round(valor*100);
+  const tol = Math.round(TOLERANCIA_VALOR*100);
+  let out = [];
+  for(let c=centro-tol; c<=centro+tol; c++){
+    const lista = idx.get(c);
+    if(lista) out = out.concat(lista);
+  }
+  return tol>0 ? out.sort((a,b)=>a-b) : out;
+}
+
 function conferir(banco, sistema){
   const sis = sistema.map(s => ({ ...s, usado:false }));
   const ban = banco.map(b => ({ ...b, usado:false }));
+  const idxValor = indexaPorValor(sis);
 
   const ok        = [];
   const datasDiff = [];
   const div       = [];
 
+  // acha, entre os candidatos com valor compatível, o primeiro ainda não
+  // usado que também passa no teste extra da camada (nome, data, etc.)
+  function achaPar(b, testeExtra){
+    for(const i of candidatosPorValor(idxValor, b.valor)){
+      const s = sis[i];
+      if(!s.usado && valoresBatem(s.valor,b.valor) && testeExtra(s)) return i;
+    }
+    return -1;
+  }
+
   // Camada 1: valor + nome + vencimento (tudo bate) -> CONFERIDO
   ban.forEach(b => {
-    const i = sis.findIndex(s => !s.usado && s.valor===b.valor && nomesBatem(b.nome,s.nome) && mesmaData(b.venc,s.venc));
+    const i = achaPar(b, s => nomesBatem(b.nome,s.nome) && mesmaData(b.venc,s.venc));
     if(i>=0){ sis[i].usado = true; b.usado = true; ok.push({ banco:b, sistema:sis[i] }); }
   });
 
   // Camada 2: valor + nome batem, mas a DATA é diferente -> DATA DIVERGENTE
   ban.forEach(b => {
     if(b.usado) return;
-    const i = sis.findIndex(s => !s.usado && s.valor===b.valor && nomesBatem(b.nome,s.nome));
+    const i = achaPar(b, s => nomesBatem(b.nome,s.nome));
     if(i>=0){ sis[i].usado = true; b.usado = true; datasDiff.push({ banco:b, sistema:sis[i] }); }
   });
 
   // Camada 3: só o valor bate (nome diferente) -> NOME DIVERGENTE
   ban.forEach(b => {
     if(b.usado) return;
-    const i = sis.findIndex(s => !s.usado && s.valor===b.valor);
+    const i = achaPar(b, () => true);
     if(i>=0){ sis[i].usado = true; b.usado = true; div.push({ banco:b, sistema:sis[i] }); }
   });
 
@@ -547,8 +593,13 @@ function tabelaPares(dados, destaque){
   if(!dados.length) return '<p class="vazio">Nenhum registro nesta categoria.</p>';
   let h = '<table><thead><tr><th>Valor</th><th>Nome no banco</th><th></th><th>Nome no sistema</th></tr></thead><tbody>';
   dados.forEach(d => {
+    const diff = Math.round((d.banco.valor - d.sistema.valor)*100)/100;
+    const sinal = diff>0 ? '+' : '';
+    const valorCel = diff===0
+      ? brl(d.banco.valor)
+      : `${brl(d.banco.valor)} <span class="tol" title="Sistema: ${brl(d.sistema.valor)} (dif. ${sinal}${brl(diff)})">±</span>`;
     h += `<tr class="${destaque?'row-div':''}">
-      <td class="val">${brl(d.banco.valor)}</td>
+      <td class="val">${valorCel}</td>
       <td>${escapa(d.banco.nome)}</td>
       <td class="arrow">≠</td>
       <td>${escapa(d.sistema.nome)}</td></tr>`;
@@ -578,11 +629,11 @@ function tabelaDatas(dados){
 
 let arqBanco = null, arqSis = null, ddaUltimo = null;
 
-function ddaCheca(){ document.getElementById('ddaBtnGo').disabled = !(arqBanco && arqSis); }
+function ddaCheca(){ $('ddaBtnGo').disabled = !(arqBanco && arqSis); }
 ligaDrop('dropBanco','fileBanco','txtBanco', f => { arqBanco = f; ddaCheca(); });
 ligaDrop('dropSis','fileSis','txtSis', f => { arqSis = f; ddaCheca(); });
 
-document.getElementById('ddaBtnGo').addEventListener('click', async () => {
+$('ddaBtnGo').addEventListener('click', async () => {
   limpaErro('ddaErro');
   try{
     const [mB, mS] = await Promise.all([lerMatriz(arqBanco), lerMatriz(arqSis)]);
@@ -595,28 +646,28 @@ document.getElementById('ddaBtnGo').addEventListener('click', async () => {
     const r = conferir(banco, sistema);
     ddaUltimo = r;
 
-    document.getElementById('ddaNOk').textContent    = r.ok.length;
-    document.getElementById('ddaNDiv').textContent   = r.div.length;
-    document.getElementById('ddaNData').textContent  = r.datasDiff.length;
-    document.getElementById('ddaNBanco').textContent = r.soBanco.length;
-    document.getElementById('ddaNSis').textContent   = r.soSis.length;
+    $('ddaNOk').textContent    = r.ok.length;
+    $('ddaNDiv').textContent   = r.div.length;
+    $('ddaNData').textContent  = r.datasDiff.length;
+    $('ddaNBanco').textContent = r.soBanco.length;
+    $('ddaNSis').textContent   = r.soSis.length;
 
-    document.getElementById('ddaTblDiv').innerHTML   = tabelaPares(r.div, true);
-    document.getElementById('ddaTblData').innerHTML  = tabelaDatas(r.datasDiff);
-    document.getElementById('ddaTblBanco').innerHTML = tabelaSimples(r.soBanco);
-    document.getElementById('ddaTblSis').innerHTML   = tabelaSimples(r.soSis);
-    document.getElementById('ddaTblOk').innerHTML    = tabelaPares(r.ok, false);
+    $('ddaTblDiv').innerHTML   = tabelaPares(r.div, true);
+    $('ddaTblData').innerHTML  = tabelaDatas(r.datasDiff);
+    $('ddaTblBanco').innerHTML = tabelaSimples(r.soBanco);
+    $('ddaTblSis').innerHTML   = tabelaSimples(r.soSis);
+    $('ddaTblOk').innerHTML    = tabelaPares(r.ok, false);
 
-    document.getElementById('ddaResultado').style.display = 'block';
-    document.getElementById('ddaBtnXlsx').classList.remove('oculto');
-    document.getElementById('ddaBtnReset').classList.remove('oculto');
-    document.getElementById('ddaResultado').scrollIntoView({behavior:'smooth', block:'start'});
+    $('ddaResultado').style.display = 'block';
+    $('ddaBtnXlsx').classList.remove('oculto');
+    $('ddaBtnReset').classList.remove('oculto');
+    $('ddaResultado').scrollIntoView({behavior:'smooth', block:'start'});
   }catch(err){
     mostraErro('ddaErro', err.message || 'Erro ao processar os arquivos.');
   }
 });
 
-document.getElementById('ddaBtnReset').addEventListener('click', () => location.reload());
+$('ddaBtnReset').addEventListener('click', () => location.reload());
 
 const COLS_PADRAO = [
   { cab:'Vencimento',        w:14 },
@@ -680,7 +731,7 @@ function montaAbaDda(wb, nomeAba, titulo, colunas, linhas){
   return ws;
 }
 
-document.getElementById('ddaBtnXlsx').addEventListener('click', async () => {
+$('ddaBtnXlsx').addEventListener('click', async () => {
   if(!ddaUltimo) return;
 
   const wb = new ExcelJS.Workbook();
@@ -849,9 +900,9 @@ function tabelaDuplicados(grupos){
 
 let cbArquivo = null, cbUltimo = null;
 
-ligaDrop('cbDrop','cbFile','cbTxt', f => { cbArquivo = f; document.getElementById('cbBtnGo').disabled = false; });
+ligaDrop('cbDrop','cbFile','cbTxt', f => { cbArquivo = f; $('cbBtnGo').disabled = false; });
 
-document.getElementById('cbBtnGo').addEventListener('click', async () => {
+$('cbBtnGo').addEventListener('click', async () => {
   limpaErro('cbErro');
   try{
     const m = await lerMatriz(cbArquivo);
@@ -869,24 +920,24 @@ document.getElementById('cbBtnGo').addEventListener('click', async () => {
 
     cbUltimo = { titulos, divergencias, duplicados };
 
-    document.getElementById('cbNTotal').textContent = titulos.length;
-    document.getElementById('cbNDiv').textContent    = divergencias.length;
-    document.getElementById('cbNDup').textContent    = qtdDuplicados;
-    document.getElementById('cbNOk').textContent     = titulos.length - divergencias.length;
+    $('cbNTotal').textContent = titulos.length;
+    $('cbNDiv').textContent    = divergencias.length;
+    $('cbNDup').textContent    = qtdDuplicados;
+    $('cbNOk').textContent     = titulos.length - divergencias.length;
 
-    document.getElementById('cbTblDiv').innerHTML = tabelaDivergencias(divergencias);
-    document.getElementById('cbTblDup').innerHTML = tabelaDuplicados(duplicados);
+    $('cbTblDiv').innerHTML = tabelaDivergencias(divergencias);
+    $('cbTblDup').innerHTML = tabelaDuplicados(duplicados);
 
-    document.getElementById('cbResultado').style.display = 'block';
-    document.getElementById('cbBtnXlsx').classList.remove('oculto');
-    document.getElementById('cbBtnReset').classList.remove('oculto');
-    document.getElementById('cbResultado').scrollIntoView({behavior:'smooth', block:'start'});
+    $('cbResultado').style.display = 'block';
+    $('cbBtnXlsx').classList.remove('oculto');
+    $('cbBtnReset').classList.remove('oculto');
+    $('cbResultado').scrollIntoView({behavior:'smooth', block:'start'});
   }catch(err){
     mostraErro('cbErro', err.message || 'Erro ao processar o arquivo.');
   }
 });
 
-document.getElementById('cbBtnReset').addEventListener('click', () => location.reload());
+$('cbBtnReset').addEventListener('click', () => location.reload());
 
 const AZUL_CAB = 'FF1F4E8C';
 const BRANCO = 'FFFFFFFF';
@@ -928,7 +979,7 @@ function montaAbaCb(wb, nome, colunas, linhas){
   return ws;
 }
 
-document.getElementById('cbBtnXlsx').addEventListener('click', async () => {
+$('cbBtnXlsx').addEventListener('click', async () => {
   if(!cbUltimo) return;
 
   const wb = new ExcelJS.Workbook();
