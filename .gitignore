@@ -1,0 +1,8 @@
+# Pastas locais (dados reais e cópias de segurança)
+EXEMPLOS/
+backup/
+
+# Planilhas e PDFs
+*.xlsx
+*.xls
+*.pdf

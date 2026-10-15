@@ -1,101 +1,123 @@
-# Conciliação Financeira
+# Conferência DDA
 
-Aplicação web simples (roda 100% no navegador, num único arquivo HTML — sem servidor, sem build, sem frameworks) com **duas ferramentas de conciliação**, organizadas em abas:
+Aplicação web simples para o contas a pagar. Roda 100% no navegador, sem servidor, sem build e sem frameworks. Tem **três conferências** e uma página de **Ajuda**, num menu lateral:
 
-- **Conferência de DDA** — compara o débito automático do banco com os títulos a pagar do sistema.
-- **Conferência de Código de Barras** — compara o valor lido no código de barras (linha digitável) de cada boleto com o saldo lançado no sistema, e aponta códigos duplicados.
+- **Conferência Santander**: compara o DDA (Débito Direto Autorizado) do Santander com os títulos a pagar do sistema.
+- **Conferência Itaú**: a mesma conferência com o DDA do Itaú, com CNPJ, banco emissor, código de barras, boletos com desconto e filtro por unidade.
+- **Código de barras**: compara o valor gravado no código de barras de cada título com o saldo lançado no sistema e aponta códigos lançados mais de uma vez.
+- **Ajuda**: passo a passo de cada conferência, o que fazer com cada grupo, tabela de status e perguntas frequentes.
 
 ## Como usar
 
-Basta abrir o `index.html` no navegador (duplo clique já funciona, não precisa de instalação nem servidor). As duas ferramentas ficam nas abas no topo da página.
+Abra o `index.html` no navegador. O duplo clique já funciona: não precisa instalar nada nem ter servidor. Os arquivos `style.css` e `app.js` precisam ficar na mesma pasta.
 
-Para abrir direto numa ferramenta específica, use o link com a âncora:
+Cada seção tem seu endereço, então dá pra abrir direto numa delas, e o botão Voltar do navegador funciona:
 
-- `index.html#dda` → Conferência de DDA
-- `index.html#codigo-barras` → Conferência de Código de Barras
+- `index.html#santander`: Conferência Santander (o antigo `#dda` também abre aqui)
+- `index.html#itau`: Conferência Itaú
+- `index.html#codigo-barras`: Código de barras
+- `index.html#ajuda`: Ajuda
 
-### Conferência de DDA
+Todas as conferências seguem a mesma ordem na tela:
 
-1. Suba o arquivo do **DDA do banco** na primeira caixa.
-2. Suba o arquivo do **sistema (títulos a pagar)** na segunda caixa.
-3. Clique em **Conferir**.
-4. Revise os cinco blocos de resultado na tela.
-5. Se quiser, clique em **Baixar resultado (Excel)** para gerar uma planilha com uma aba por categoria.
-
-### Conferência de Código de Barras
-
-1. Suba o relatório de **títulos a pagar** do sistema.
+1. Envie os arquivos Excel (clicando na caixa ou arrastando o arquivo). O nome do arquivo aparece na caixa e no alto da tela.
 2. Clique em **Conferir**.
-3. Revise os blocos de **divergências de valor** e **códigos duplicados**.
-4. Se quiser, clique em **Baixar resultado (Excel)** para gerar uma planilha com uma aba por categoria.
+3. Veja os **cartões de resumo**: um por grupo, com a quantidade e o valor total. O **?** de cada cartão explica o grupo.
+4. Use a **tabela de resultado**: clique num cartão para ver só aquele grupo, busque por fornecedor, NF ou valor, e veja o total no rodapé (soma do que está aparecendo).
+5. Clique em **Baixar resultado (Excel)** para gerar a planilha, com uma aba por grupo.
+
+A página de Ajuda (no rodapé do menu) explica tudo isso em linguagem simples, para quem vai usar no dia a dia.
 
 ---
 
-## Conferência de DDA
+## Conferência de DDA (Santander e Itaú)
 
-Você sobe as duas planilhas Excel (DDA do banco + títulos a pagar do sistema), e a página aponta:
+Você envia o DDA do banco e o relatório de títulos a pagar do sistema, e a página separa os títulos em cinco grupos:
 
-- o que **bate** certinho (valor, nome e vencimento conferem);
-- o que tem **valor e nome iguais mas vencimento diferente** (mesmo título, data divergente);
-- o que tem **valor igual mas nome diferente** (possível factoring/cessão de crédito);
-- o que está **só no banco** (não encontrado no sistema);
-- o que está **só no sistema** (não encontrado no banco).
+| Grupo | Cor | O que significa |
+| --- | --- | --- |
+| Conferido | verde | valor, nome e vencimento batem |
+| Data divergente | âmbar | valor e nome batem, mas o vencimento é diferente |
+| Nome divergente | roxo | só o valor bate (possível factoring/cessão de crédito) |
+| Só no banco | vermelho | boleto no DDA sem título no sistema |
+| Só no sistema | cinza | título no sistema sem boleto no DDA |
 
-### Formato esperado das planilhas
+### Arquivos esperados
 
-| Arquivo                   | Cabeçalho na linha | Coluna do nome | Coluna do valor |
-| ------------------------- | ------------------ | -------------- | --------------- |
-| DDA do Banco               | 5                  | B              | E               |
-| Sistema (Títulos a Pagar)  | 6                  | C              | P (saldo)       |
+| Arquivo | Como é lido |
+| --- | --- |
+| DDA do Santander | Excel do Pagador Eletrônico. Cabeçalho na linha 5; A = Vencimento, B = Beneficiário, C = Nosso Número, D = Pagador, E = Valor. |
+| DDA do Itaú | Excel "Consulta Boletos Recebidos". As primeiras linhas têm os dados da conta (inclusive "Data/Hora" da consulta, mostrada na tela). O cabeçalho é achado pelo conteúdo: a linha com "Beneficiário" e "Código de barras". Colunas: Pagador/Agregado, Beneficiário, CPF/CNPJ, Venc., Nº Doc., Até Venc., A Pagar, Tipo de Boleto, Banco, Observações, Código de barras. |
+| Títulos a pagar do sistema | Dados a partir da linha 7; C = Nome, D = Título (NF), P = Saldo. O título (NF) só aparece na tabela e entra na busca; não é usado na conferência. |
 
-As colunas E até O do arquivo do sistema são ignoradas automaticamente — só o nome (coluna C) e o saldo (coluna P) são usados na conferência.
+O banco do arquivo é descoberto pelo **conteúdo**, não pelo nome. Se o DDA do Itaú for enviado na tela do Santander (ou o contrário), a página avisa e não confere.
+
+### Particularidades do Itaú
+
+- O valor comparado é o **"Até Venc."**. O **"A Pagar"** fica guardado à parte; quando os dois são diferentes, o boleto é marcado **com desconto**.
+- **Filtro por unidade**: quem tem "CAPINOPOLIS" no Pagador (com ou sem acento e espaços) é **Unidade Capinópolis**; o resto é **Matriz**. O relatório do sistema não é separado por unidade, então, ao filtrar uma unidade, os títulos da outra caem em "Só no sistema".
+- A tabela e o Excel trazem CNPJ, banco emissor (código, ex.: 237) e código de barras; o Excel traz também "A pagar", "Desconto" e "Unidade".
 
 ### Como a conferência funciona
 
-1. Para cada título do banco, procura no sistema um título com o **mesmo valor**, **nome parecido** e **mesmo vencimento** → vai para **Conferidos**.
-2. Se valor e nome baterem mas o **vencimento for diferente**, considera **Data divergente** (mesmo título, lançado com outra data).
-3. Se não achar nome parecido mas o **valor bater**, considera **Nome divergente** (sinal de possível factoring, já que o beneficiário pode ter mudado por causa da cessão do título).
-4. O que sobrar de cada lado, sem par nenhum, cai em **Só no banco** ou **Só no sistema**.
+1. Para cada boleto do banco, procura no sistema um título com o **mesmo valor**, **nome parecido** e **mesmo vencimento** → **Conferido**.
+2. Se valor e nome baterem mas o **vencimento for diferente** → **Data divergente**.
+3. Se só o **valor** bater → **Nome divergente**.
+4. O que sobrar de cada lado vai para **Só no banco** ou **Só no sistema**.
 
-O pareamento é feito em camadas, do mais rigoroso (passo 1) ao mais frouxo (passo 3): um título já casado numa camada não entra mais na disputa das camadas seguintes.
+O pareamento é feito em camadas, da mais rigorosa (1) à mais frouxa (3): um título já pareado não entra mais nas camadas seguintes. Diferença de até **1 centavo** conta como mesmo valor (aparece um ± ao lado do valor na tela). A comparação de nomes tolera nomes cortados pelo banco e pequenas variações de escrita (prefixo e semelhança de texto).
 
-A comparação de nomes é tolerante a diferenças: nomes truncados pelo banco e pequenas variações de escrita ainda são considerados o "mesmo" beneficiário (usando prefixo e similaridade de texto).
+### Leitores por banco
 
----
+Cada banco tem um "leitor" no `app.js` (seção **LEITORES POR BANCO**) que transforma o Excel do banco numa lista no formato comum:
 
-## Conferência de Código de Barras
+```
+{ venc, beneficiario, cnpj, doc, valor, valorAPagar, codigoBarras, pagador, banco, comDesconto }
+```
 
-Você sobe **um** relatório de títulos a pagar do sistema, e a página compara o valor lido em cada código de barras com o saldo lançado.
-
-### Detecção do arquivo
-
-- O cabeçalho é encontrado automaticamente: é a linha que tem, ao mesmo tempo, uma célula com **"Código de Barras"** e uma com **"Saldo"** (isso evita confundir com o subtítulo abreviado "Cód. Barras" que aparece antes do cabeçalho real).
-- As colunas são mapeadas pelo texto do cabeçalho: código de barras (contém "BARRA"), saldo (contém "SALDO"), vencimento (contém "VENC"), duplicata (contém "DUPLICATA"), e nome (coluna imediatamente à direita de "Cliente").
-- Se não conseguir mapear pelo texto, usa um fallback fixo: A=Vencto, B=Cliente, C=Nome, D=Duplicata, K=Código de barras, L=Saldo.
-- Só entram na conferência linhas com saldo numérico e código de barras com **40 ou mais dígitos**.
-
-### Como o valor é lido do código de barras
-
-O valor de um boleto está nos **últimos 10 dígitos** da linha digitável, em centavos. A página remove pontos/espaços do código, pega os últimos 10 dígitos e divide por 100.
-
-### As duas conferências
-
-- **Divergência de valor**: quando a diferença entre o valor lido no código e o saldo lançado é de 0,005 ou mais (qualquer diferença, inclusive de centavos). A tabela é ordenada da maior diferença para a menor.
-- **Códigos duplicados**: mesmo código de barras aparecendo em mais de um título, agrupados visualmente na tabela.
+A conferência só trabalha com esse formato. Para incluir um banco novo, basta escrever o leitor dele e ensinar a função `detectaBanco` a reconhecer o arquivo.
 
 ---
 
-## Tecnologias
+## Código de barras
 
-- HTML, CSS e JavaScript puro, num único arquivo autocontido (sem frameworks, sem build).
-- [SheetJS (xlsx.js)](https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js) via CDN, para **ler** os arquivos Excel enviados.
-- [ExcelJS](https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js) via CDN, para **gerar** as planilhas de resultado já formatadas (cores, bordas, larguras de coluna, cabeçalho congelado).
+Você envia **um** relatório de títulos a pagar com as colunas de código de barras e saldo.
+
+- O cabeçalho é encontrado sozinho: a linha que tem uma célula com **"Código de Barras"** e outra com **"Saldo"** (isso evita confundir com o subtítulo abreviado "Cód. Barras").
+- As colunas são achadas pelo texto do cabeçalho (BARRA, SALDO, VENC, DUPLICATA e o nome logo à direita de "Cliente"). Se não achar, usa A = Vencto, B = Cliente, C = Nome, D = Duplicata, K = Código de barras, L = Saldo.
+- Só entram títulos com saldo numérico e código com **40 ou mais dígitos**.
+- O valor do boleto é lido dos **últimos 10 dígitos** do código, em centavos.
+
+Grupos:
+
+- **Conferido** (verde): o valor do código bate com o saldo.
+- **Divergência de valor** (âmbar): diferença de 0,005 ou mais; a tabela começa pelas maiores diferenças.
+- **Duplicado** (vermelho): o mesmo código em mais de um título; os repetidos têm o mesmo número de grupo. Um título pode ser divergente e duplicado ao mesmo tempo.
+
+---
 
 ## Arquivos do projeto
 
-- `index.html` — página única e autocontida com as duas ferramentas: estrutura (HTML), aparência (CSS) e toda a lógica (JavaScript) num só arquivo.
-- `legado/` — versão anterior, antes da fusão em abas: `index.html`/`style.css`/`script.js` (só a Conferência de DDA) e `conferencia-codigo-barras.html` (ferramenta avulsa). Mantidos apenas como referência; não são usados pela aplicação atual.
+- `index.html`: estrutura da página (menu, as três conferências e a Ajuda).
+- `style.css`: aparência. Todas as cores, fontes e medidas ficam como variáveis no início do arquivo.
+- `app.js`: toda a lógica, em seções: navegação, funções compartilhadas e tabela de resultado, leitores por banco, Conferência de DDA (Santander), Conferência Itaú, Código de barras e ajuda dos cartões.
+- `legado/`: versões antigas, mantidas só como referência (não são usadas pelo app).
+- `.gitignore`: impede o envio das pastas `EXEMPLOS/` e `backup/` e de qualquer `.xlsx`, `.xls` ou `.pdf` (arquivos com dados reais).
+
+## Tecnologias
+
+- HTML, CSS e JavaScript puro, sem frameworks e sem build.
+- [SheetJS (xlsx.js) 0.18.5](https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js), via CDN, para **ler** os Excel enviados.
+- [ExcelJS 4.4.0](https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js), via CDN, para **gerar** as planilhas de resultado formatadas.
+- Fontes IBM Plex Sans e IBM Plex Mono, do Google Fonts. Sem internet, o navegador usa as fontes do sistema.
+
+As bibliotecas e as fontes vêm da internet; sem conexão, a página abre mas não consegue ler nem gerar Excel.
+
+## Limitações conhecidas
+
+- **Código de barras de 44 dígitos**: a leitura pelos últimos 10 dígitos está certa para a linha digitável (47 dígitos). No código de barras de 44 dígitos o valor fica no meio (do 10º ao 19º dígito); se o relatório do sistema trouxer esse formato, os títulos vão aparecer como divergentes.
+- **Caminhos de exportação**: os caminhos no internet banking e no sistema descritos na Ajuda foram deduzidos dos arquivos de exemplo e podem precisar de ajuste.
 
 ## Privacidade
 
-Todo o processamento acontece localmente, no navegador. Nenhum dado das planilhas é enviado para servidor algum.
+Todo o processamento acontece no navegador. Nenhum dado das planilhas é enviado para servidor algum.

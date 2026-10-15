@@ -1,0 +1,281 @@
+/* ===================================================================
+   ESTILOS DA PÁGINA — visual "extrato bancário"
+   Todas as cores, fontes e medidas ficam nestas variáveis. As seções
+   (conferências e Ajuda) usam só elas: pra mudar o visual, mude aqui.
+   =================================================================== */
+:root{
+  /* menu lateral */
+  --menu-fundo:#0F4C47;              /* verde-petróleo escuro */
+  --menu-texto:#F2F7F6;
+  --menu-texto-fraco:#B5CDC8;
+  --menu-item-ativo:rgba(255,255,255,.13);
+  --menu-item-hover:rgba(255,255,255,.07);
+
+  /* área principal */
+  --fundo:#F3F6F5;                   /* cinza-esverdeado bem claro */
+  --superficie:#FFFFFF;              /* cartões e tabela */
+  --superficie-suave:#F8FAF9;        /* cabeçalho e rodapé da tabela */
+  --borda:#DDE5E2;
+  --borda-forte:#C3D1CC;
+  --texto:#1B2A26;
+  --texto-fraco:#5D6D68;
+  --raio:10px;
+
+  /* botões e foco */
+  --botao-principal:#0F4C47;         /* Conferir */
+  --botao-principal-hover:#0B3A36;
+  --botao-verde:#17653B;             /* Baixar resultado (Excel) */
+  --botao-verde-hover:#11502E;
+  --foco:#2C8C7C;
+
+  /* cores dos grupos: fundo claro + texto escuro da mesma cor */
+  --conferido-fundo:#E2F2E8;      --conferido-texto:#17653B;   /* verde */
+  --data-fundo:#FBEFD3;           --data-texto:#7A4F00;        /* âmbar */
+  --nome-fundo:#ECE7F8;           --nome-texto:#4B3A8C;        /* roxo */
+  --so-banco-fundo:#FBE4E1;       --so-banco-texto:#9A2A1C;    /* vermelho */
+  --so-sistema-fundo:#ECEFEE;     --so-sistema-texto:#44534E;  /* cinza */
+
+  /* fontes */
+  --fonte-texto:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte-numeros:"IBM Plex Mono", ui-monospace, Consolas, "Courier New", monospace;
+}
+
+/* cada grupo aponta pras cores dele; cartões, etiquetas e bolinhas usam --cor e --cor-fundo */
+.g-ok   {--cor:var(--conferido-texto);  --cor-fundo:var(--conferido-fundo)}
+.g-data {--cor:var(--data-texto);       --cor-fundo:var(--data-fundo)}
+.g-nome {--cor:var(--nome-texto);       --cor-fundo:var(--nome-fundo)}
+.g-banco{--cor:var(--so-banco-texto);   --cor-fundo:var(--so-banco-fundo)}
+.g-sis  {--cor:var(--so-sistema-texto); --cor-fundo:var(--so-sistema-fundo)}
+.g-valor{--cor:var(--data-texto);       --cor-fundo:var(--data-fundo)}       /* código de barras: valor diferente */
+.g-dup  {--cor:var(--so-banco-texto);   --cor-fundo:var(--so-banco-fundo)}   /* código de barras: duplicado */
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  font-family:var(--fonte-texto);
+  font-size:15px;line-height:1.5;
+  background:var(--fundo);color:var(--texto);
+  display:flex;min-height:100vh;     /* menu lateral à esquerda + conteúdo à direita */
+}
+
+/* valores, datas e números de documento: fonte mono com números alinhados */
+.mono,.stat-qtd,.stat-total,.selo{font-family:var(--fonte-numeros);font-variant-numeric:tabular-nums}
+
+.ico{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.oculto{display:none}
+:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+
+/* ---------- Menu lateral ---------- */
+.menu{
+  width:236px;flex-shrink:0;
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  background:var(--menu-fundo);color:var(--menu-texto);
+  padding:20px 12px;display:flex;flex-direction:column;gap:2px;
+  transition:width .2s;
+}
+.menu-marca{display:flex;align-items:center;gap:10px;padding:4px 10px 22px;font-size:16px;font-weight:600;white-space:nowrap}
+.selo{
+  font-size:12px;font-weight:600;letter-spacing:.08em;
+  padding:3px 7px;border:1px solid rgba(255,255,255,.5);border-radius:6px;
+}
+.menu-item{
+  display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;
+  color:var(--menu-texto-fraco);text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap;
+}
+.menu-item:hover{background:var(--menu-item-hover);color:var(--menu-texto)}
+.menu-item.ativo{background:var(--menu-item-ativo);color:var(--menu-texto)}
+.menu-item:focus-visible{outline-color:var(--menu-texto)}
+.menu-rodape{margin-top:auto}
+.menu-txt{overflow:hidden;text-overflow:ellipsis}
+.menu-fundo{display:none}
+
+/* computador: menu recolhido mostra só os ícones (o title mostra o nome) */
+@media(min-width:761px){
+  .menu-recolhido .menu{width:68px}
+  .menu-recolhido .menu-txt{display:none}
+  .menu-recolhido .menu-item,
+  .menu-recolhido .menu-marca{justify-content:center;padding-left:0;padding-right:0}
+}
+
+/* celular: menu fica escondido e abre por cima da tela */
+@media(max-width:760px){
+  .menu{
+    position:fixed;left:0;top:0;bottom:0;z-index:20;width:260px;
+    transform:translateX(-100%);visibility:hidden;
+    transition:transform .2s,visibility .2s;
+  }
+  .menu-aberto .menu{transform:none;visibility:visible}
+  .menu-aberto .menu-fundo{display:block;position:fixed;inset:0;z-index:10;background:rgba(15,76,71,.35)}
+}
+
+/* ---------- Área principal ---------- */
+.conteudo{flex:1;min-width:0}
+.barra-topo{padding:14px 32px 0}
+.menu-toggle{
+  display:grid;place-items:center;width:36px;height:36px;padding:0;cursor:pointer;
+  background:var(--superficie);color:var(--texto);border:1px solid var(--borda);border-radius:8px;
+}
+.menu-toggle:hover{border-color:var(--borda-forte)}
+main{max-width:1240px;margin:0 auto;padding:6px 32px 64px}
+
+/* cabeçalho de cada tela: linha pequena, título e, à direita, arquivos + Baixar */
+.tela-cabecalho{
+  display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px 24px;
+  padding:10px 0 20px;border-bottom:1px solid var(--borda);
+}
+.sobretitulo{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--texto-fraco)}
+.tela-cabecalho h1{font-size:28px;font-weight:600;letter-spacing:-.01em;line-height:1.25;margin-top:2px}
+.tela-acoes{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px}
+.tela-arquivos{font-size:13px;color:var(--texto-fraco);max-width:420px;overflow-wrap:anywhere}
+
+@media(max-width:760px){
+  .barra-topo{padding:12px 16px 0}
+  main{padding:4px 16px 48px}
+  .tela-cabecalho h1{font-size:24px}
+}
+
+/* ---------- Botões ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;line-height:1.2;
+  padding:10px 18px;border-radius:8px;border:1px solid transparent;
+}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-conferir{background:var(--botao-principal);color:#fff}
+.btn-conferir:hover:not(:disabled){background:var(--botao-principal-hover)}
+.btn-baixar{background:var(--botao-verde);color:#fff}
+.btn-baixar:hover:not(:disabled){background:var(--botao-verde-hover)}
+.btn-sec{background:var(--superficie);color:var(--texto);border-color:var(--borda)}
+.btn-sec:hover{border-color:var(--borda-forte)}
+.acoes{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;margin-top:16px}
+.acoes-final{margin-top:20px}
+
+.campo{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:var(--texto-fraco)}
+.campo select{
+  font-family:inherit;font-size:14px;color:var(--texto);cursor:pointer;
+  padding:8px 10px;background:var(--superficie);border:1px solid var(--borda);border-radius:8px;
+}
+
+/* ---------- Envio dos arquivos (clicar ou arrastar) ---------- */
+.envio{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:24px}
+.envio-unico{grid-template-columns:minmax(0,560px)}
+.drop{
+  position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  padding:18px 20px;cursor:pointer;
+  background:var(--superficie);border:1.5px dashed var(--borda-forte);border-radius:var(--raio);
+}
+.drop:hover,.drop.over{border-color:var(--botao-principal)}
+.drop:focus-within{outline:2px solid var(--foco);outline-offset:2px}
+/* o campo de arquivo fica invisível, mas continua alcançável pelo teclado */
+.drop input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.drop-ico{width:22px;height:22px;color:var(--texto-fraco);margin-bottom:6px}
+.drop-titulo{font-weight:600}
+.drop-dica{font-size:13px;color:var(--texto-fraco)}
+.drop-arquivo{margin-top:10px;font-size:13px;color:var(--texto-fraco);overflow-wrap:anywhere}
+.drop.ok{border-style:solid;border-color:var(--conferido-texto)}
+.drop.ok .drop-ico,.drop.ok .drop-arquivo{color:var(--conferido-texto)}
+.drop.ok .drop-arquivo{font-weight:600}
+
+/* ---------- Mensagem de erro e dados da consulta ---------- */
+.erro-box{
+  display:none;margin-top:16px;padding:12px 16px;font-size:14px;
+  background:var(--so-banco-fundo);color:var(--so-banco-texto);
+  border:1px solid var(--so-banco-texto);border-radius:var(--raio);
+}
+.resultado{display:none}
+.info-consulta{margin-top:24px;font-size:13px;color:var(--texto-fraco)}
+.info-consulta b{color:var(--texto);font-weight:600}
+
+/* ---------- Cartões de resumo (clicar filtra a tabela) ---------- */
+.resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:20px}
+.info-consulta + .resumo{margin-top:12px}
+.stat{position:relative;background:var(--superficie);border:1px solid var(--borda);border-radius:var(--raio)}
+.stat:hover{border-color:var(--borda-forte)}
+.stat.ativo{border-color:var(--cor);background:var(--cor-fundo)}
+.stat-filtro{
+  display:flex;flex-direction:column;align-items:flex-start;width:100%;
+  padding:14px 16px;background:none;border:0;border-radius:var(--raio);
+  font-family:inherit;color:inherit;text-align:left;cursor:pointer;
+}
+.stat-nome{display:flex;align-items:center;gap:8px;padding-right:28px;font-size:13px;font-weight:500;color:var(--texto-fraco)}
+.stat.ativo .stat-nome{color:var(--cor)}
+.bolinha{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--cor);flex-shrink:0}
+.stat-qtd{font-size:28px;font-weight:600;line-height:1.2;margin-top:8px}
+.stat-total{font-size:13px;color:var(--texto-fraco);margin-top:2px}
+
+/* ícone "?" do cartão e a explicação que abre embaixo */
+.ajuda-btn{
+  position:absolute;top:11px;right:11px;z-index:1;
+  width:22px;height:22px;padding:0;border-radius:50%;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;line-height:20px;text-align:center;
+  background:var(--superficie);color:var(--texto-fraco);border:1px solid var(--borda);
+}
+.ajuda-btn:hover,.dica-aberta .ajuda-btn{border-color:var(--texto-fraco);color:var(--texto)}
+.dica{
+  display:none;position:absolute;z-index:5;top:calc(100% + 6px);left:-1px;right:-1px;
+  padding:10px 12px;font-size:13px;line-height:1.45;
+  background:var(--texto);color:var(--superficie);border-radius:8px;
+}
+.ajuda-btn:hover + .dica,
+.ajuda-btn:focus-visible + .dica,
+.dica-aberta .dica{display:block}
+
+/* ---------- Tabela de resultado ---------- */
+.tabela-caixa{margin-top:16px;background:var(--superficie);border:1px solid var(--borda);border-radius:var(--raio);overflow:hidden}
+.tabela-ferramentas{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;padding:12px 14px;border-bottom:1px solid var(--borda)}
+.busca{
+  display:flex;align-items:center;gap:8px;flex:1;min-width:220px;max-width:420px;
+  padding:0 10px;color:var(--texto-fraco);
+  background:var(--superficie);border:1px solid var(--borda);border-radius:8px;
+}
+.busca:focus-within{border-color:var(--foco)}
+.busca input{flex:1;min-width:0;padding:8px 0;border:0;outline:0;background:transparent;font-family:inherit;font-size:14px;color:var(--texto)}
+.filtro-ativo{font-size:13px;color:var(--texto-fraco);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.filtro-ativo[hidden]{display:none}
+.limpa-filtro{font-family:inherit;font-size:13px;color:var(--foco);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
+
+.tabela-rolagem{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{
+  padding:10px 14px;text-align:left;white-space:nowrap;
+  font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--texto-fraco);
+  background:var(--superficie-suave);border-bottom:1px solid var(--borda);
+}
+td{padding:10px 14px;border-bottom:1px solid var(--borda);vertical-align:top}
+tbody tr:hover td{background:var(--superficie-suave)}
+tfoot td{font-weight:600;background:var(--superficie-suave);border-bottom:0}
+.num{text-align:right;white-space:nowrap}
+td.mono{white-space:nowrap}
+.sub{display:block;margin-top:2px;font-size:12px;color:var(--texto-fraco)}
+td.cod{min-width:220px;max-width:260px;font-size:12px;color:var(--texto-fraco);white-space:normal;word-break:break-all}
+td.forn{min-width:200px}
+.tol{color:var(--data-texto);cursor:help;font-weight:600}
+.diff{color:var(--so-banco-texto)}
+.vazio{padding:22px 14px;color:var(--texto-fraco);text-align:center}
+
+/* etiqueta de status: fundo claro e texto escuro da cor do grupo */
+.status{
+  display:inline-block;padding:2px 10px;border-radius:999px;white-space:nowrap;
+  font-size:12px;font-weight:600;background:var(--cor-fundo);color:var(--cor);
+}
+td .status + .status{margin-top:4px}
+.status-mini{margin-top:4px;padding:1px 8px;font-size:11px}
+
+/* ---------- Página de Ajuda ---------- */
+.ajuda-intro{margin-top:18px;color:var(--texto-fraco);max-width:780px}
+.ajuda-bloco{margin-top:16px;padding:20px 24px;background:var(--superficie);border:1px solid var(--borda);border-radius:var(--raio)}
+.ajuda-bloco h2{font-size:18px;font-weight:600}
+.ajuda-bloco h3{font-size:14px;font-weight:600;margin-top:18px}
+.ajuda-bloco p,.ajuda-bloco li{max-width:780px}
+.ajuda-bloco p{margin-top:6px}
+.ajuda-bloco ul,.ajuda-bloco ol{padding-left:22px;margin-top:6px}
+.ajuda-bloco li{margin-top:6px}
+.ajuda-bloco .grupos{list-style:none;padding-left:0}
+.ajuda-bloco .grupos .status{margin-right:8px}
+.ajuda-dica{color:var(--texto-fraco);font-style:italic}
+.tabela-status{margin-top:12px;border:1px solid var(--borda)}
+.tabela-status td:first-child,.tabela-status td:nth-child(2){white-space:nowrap}
+.tabela-status .bolinha{margin-right:8px}
+.ajuda-bloco details{margin-top:10px;padding:12px 16px;border:1px solid var(--borda);border-radius:8px}
+.ajuda-bloco summary{font-weight:600;cursor:pointer}
+.ajuda-bloco details[open] summary{margin-bottom:4px}

@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Conciliação Financeira — DDA &amp; Código de Barras</title>
+<title>Conferência DDA</title>
 
 <!-- Biblioteca SheetJS: lê arquivos .xlsx no navegador
      integrity = hash de segurança (SRI): garante que o arquivo baixado do CDN
@@ -18,1005 +18,534 @@
         integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<style>
-/* ===================================================================
-   ESTILOS DA PÁGINA (compartilhados pelas duas ferramentas)
-   =================================================================== */
-:root{
-  --tinta:#12283a;        /* azul-tinta escuro, cor de carimbo */
-  --papel:#f3efe6;        /* fundo cor de papel de razão contábil */
-  --linha:#d9d2c3;        /* cor das bordas/linhas */
-  --verde:#1f6b4a;        /* conferido */
-  --verde-bg:#e4efe8;
-  --ambar:#9a6a12;        /* nome divergente / factoring */
-  --ambar-bg:#f6ecd6;
-  --vermelho:#a5341f;     /* faltando / duplicado */
-  --vermelho-bg:#f3e2dc;
-  --azul:#1f4e8c;         /* data divergente */
-  --azul-bg:#dfe7f3;
-  --tinta-fraca:#5c6b78;  /* texto secundário, mais claro */
-}
+<!-- Fontes: IBM Plex Sans (texto) e IBM Plex Mono (valores, datas e documentos).
+     Sem internet, o navegador usa as fontes do sistema no lugar. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 
-*{box-sizing:border-box;margin:0;padding:0}
-
-body{
-  font-family:"Segoe UI",system-ui,sans-serif;
-  background:var(--papel);
-  color:var(--tinta);
-  line-height:1.5;
-  padding:0 0 80px;
-}
-
-/* ---------- Cabeçalho ---------- */
-header{
-  border-bottom:3px double var(--tinta);
-  padding:32px 24px 20px;
-  max-width:1200px;margin:0 auto;
-}
-.eyebrow{
-  font-size:12px;letter-spacing:3px;text-transform:uppercase;
-  color:var(--tinta-fraca);font-weight:600;
-}
-h1{
-  font-family:Georgia,"Times New Roman",serif;
-  font-size:36px;font-weight:700;letter-spacing:-.5px;margin-top:4px;
-}
-header p{color:var(--tinta-fraca);margin-top:8px;max-width:680px;font-size:15px}
-
-/* ---------- Abas (troca entre as duas ferramentas) ---------- */
-.tabs{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
-.tab-btn{
-  font-family:inherit;font-size:14px;font-weight:600;
-  padding:10px 22px;border:1px solid var(--linha);border-radius:24px;
-  background:#fff;color:var(--tinta-fraca);text-decoration:none;
-  cursor:pointer;transition:.15s;display:inline-block;
-}
-.tab-btn:hover{border-color:var(--tinta);color:var(--tinta)}
-.tab-btn.ativo{background:var(--tinta);color:var(--papel);border-color:var(--tinta)}
-
-main{max-width:1200px;margin:0 auto;padding:0 24px}
-.painel{padding-top:8px}
-
-/* ---------- Caixas de upload ---------- */
-.uploads{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:28px}
-@media(max-width:640px){.uploads{grid-template-columns:1fr}}
-
-.card{
-  background:#fff;border:1px solid var(--linha);border-radius:8px;
-  padding:20px;position:relative;
-}
-.card.solo{margin-top:28px;max-width:520px}
-.card .num{
-  font-family:Georgia,serif;font-size:13px;color:var(--tinta-fraca);
-  letter-spacing:2px;text-transform:uppercase;font-weight:700;
-}
-.card h2{font-size:18px;margin:6px 0 4px}
-.card .hint{font-size:13px;color:var(--tinta-fraca);margin-bottom:14px}
-
-/* a área tracejada onde se clica/arrasta o arquivo */
-.drop{
-  border:2px dashed var(--linha);border-radius:6px;padding:22px 14px;
-  text-align:center;cursor:pointer;transition:.15s;background:var(--papel)
-}
-.drop:hover,.drop.over{border-color:var(--tinta);background:#fff}
-.drop input{display:none}
-.drop .ico{font-size:26px}
-.drop .txt{font-size:14px;margin-top:6px;color:var(--tinta-fraca)}
-.drop.ok{border-color:var(--verde);background:var(--verde-bg)}
-.drop.ok .txt{color:var(--verde);font-weight:600}
-
-/* ---------- Botões ---------- */
-.actions{margin-top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-button{
-  font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
-  border:none;border-radius:6px;padding:12px 26px;transition:.15s;
-}
-.btn-go{background:var(--tinta);color:var(--papel)}
-.btn-go:hover{background:#1d3a52}
-.btn-go:disabled{opacity:.4;cursor:not-allowed}
-.btn-sec{background:transparent;color:var(--tinta);border:1px solid var(--linha)}
-.btn-sec:hover{border-color:var(--tinta)}
-
-/* ---------- Resumos (contadores) ---------- */
-.resumo{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:34px}
-@media(max-width:900px){.resumo{grid-template-columns:1fr 1fr 1fr}}
-@media(max-width:640px){.resumo{grid-template-columns:1fr 1fr}}
-.resumo.cols-4{grid-template-columns:repeat(4,1fr)}
-@media(max-width:760px){.resumo.cols-4{grid-template-columns:1fr 1fr}}
-
-.stat{background:#fff;border:1px solid var(--linha);border-radius:8px;padding:16px;border-left:5px solid var(--tinta)}
-.stat.ok{border-left-color:var(--verde)}
-.stat.div{border-left-color:var(--ambar)}
-.stat.data{border-left-color:var(--azul)}
-.stat.b{border-left-color:var(--vermelho)}
-.stat.s{border-left-color:var(--vermelho)}
-.stat.dup{border-left-color:var(--vermelho)}
-.stat .n{font-family:Georgia,serif;font-size:32px;font-weight:700}
-.stat .l{font-size:12px;color:var(--tinta-fraca);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
-
-/* ---------- Blocos de resultado ---------- */
-section.bloco{margin-top:34px}
-.bloco h3{
-  font-family:Georgia,serif;font-size:20px;padding-bottom:8px;
-  border-bottom:2px solid var(--tinta);display:flex;align-items:center;gap:10px
-}
-.tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.5px}
-.tag.ok{background:var(--verde-bg);color:var(--verde)}
-.tag.div{background:var(--ambar-bg);color:var(--ambar)}
-.tag.falta{background:var(--vermelho-bg);color:var(--vermelho)}
-.tag.data{background:var(--azul-bg);color:var(--azul)}
-.tag.dup{background:var(--vermelho-bg);color:var(--vermelho)}
-
-/* ---------- Tabelas ---------- */
-table{width:100%;border-collapse:collapse;margin-top:12px;background:#fff;font-size:14px}
-th{
-  text-align:left;padding:10px 12px;border-bottom:2px solid var(--linha);
-  font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--tinta-fraca)
-}
-td{padding:10px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
-tr:last-child td{border-bottom:none}
-.val{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
-.tol{color:var(--ambar);cursor:help;font-weight:700}
-.cod{font-family:"Consolas","Courier New",monospace;font-size:12px;word-break:break-all;letter-spacing:.2px;color:var(--tinta-fraca);max-width:220px}
-.diff{color:var(--vermelho)}
-.row-div{background:var(--ambar-bg)}
-.row-data{background:var(--azul-bg)}
-.grupo-inicio td{border-top:2px solid var(--tinta)}
-.arrow{color:var(--tinta-fraca);padding:0 6px}
-.vazio{color:var(--tinta-fraca);font-style:italic;padding:14px 12px;font-size:14px}
-
-/* ---------- Mensagem de erro ---------- */
-.erro-box{background:var(--vermelho-bg);color:var(--vermelho);border:1px solid var(--vermelho);
-  border-radius:6px;padding:14px 16px;margin-top:20px;font-size:14px;display:none}
-
-.resultado{display:none}
-.oculto{display:none}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<header>
-  <div class="eyebrow">Contas a Pagar · Conciliação</div>
-  <h1>Conciliação Financeira</h1>
-  <p>Duas ferramentas num só lugar: confira o DDA do banco contra os títulos do sistema, ou confira o valor lido no código de barras dos boletos contra o saldo lançado. Tudo roda no navegador, sem enviar dado nenhum pra fora.</p>
+<!-- Ícones de linha usados na página (desenhados uma vez, usados com <use>) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-banco" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5M4.5 10v8M9 10v8M15 10v8M19.5 10v8M3 20.5h18"/></symbol>
+  <symbol id="i-predio" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="1.5"/><path d="M9 7.5h1.5M13.5 7.5H15M9 11.5h1.5M13.5 11.5H15M9 15.5h1.5M13.5 15.5H15M10.5 20.5v-2.5h3v2.5"/></symbol>
+  <symbol id="i-barras" viewBox="0 0 24 24"><path d="M4 5.5v13M7 5.5v13M10 5.5v13M13.5 5.5v13M16 5.5v13M20 5.5v13"/></symbol>
+  <symbol id="i-ajuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.8v.2"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></symbol>
+  <symbol id="i-arquivo" viewBox="0 0 24 24"><path d="M14 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M12 17.5v-6M9.5 14 12 11.5l2.5 2.5"/></symbol>
+  <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></symbol>
+</svg>
 
-  <!-- Abas: cada uma é um link com #âncora, então dá pra linkar direto
-       pra uma ferramenta específica (ex: index.html#codigo-barras) -->
-  <nav class="tabs">
-    <a href="#dda" class="tab-btn" data-tab="dda">Conferência de DDA</a>
-    <a href="#codigo-barras" class="tab-btn" data-tab="codigo-barras">Conferência de Código de Barras</a>
-  </nav>
-</header>
+<!-- Menu lateral: cada item é um link com #âncora, então dá pra linkar direto
+     pra uma seção específica (ex: index.html#codigo-barras) e o Voltar funciona. -->
+<nav class="menu" id="menu" aria-label="Conferências">
+  <div class="menu-marca"><span class="selo">DDA</span><span class="menu-txt">Conferência</span></div>
+  <a href="#santander" class="menu-item" data-painel="santander" title="Conferência Santander">
+    <svg class="ico menu-ico" aria-hidden="true"><use href="#i-banco"/></svg><span class="menu-txt">Conferência Santander</span>
+  </a>
+  <a href="#itau" class="menu-item" data-painel="itau" title="Conferência Itaú">
+    <svg class="ico menu-ico" aria-hidden="true"><use href="#i-predio"/></svg><span class="menu-txt">Conferência Itaú</span>
+  </a>
+  <a href="#codigo-barras" class="menu-item" data-painel="codigo-barras" title="Código de barras">
+    <svg class="ico menu-ico" aria-hidden="true"><use href="#i-barras"/></svg><span class="menu-txt">Código de barras</span>
+  </a>
+  <a href="#ajuda" class="menu-item menu-rodape" data-painel="ajuda" title="Ajuda">
+    <svg class="ico menu-ico" aria-hidden="true"><use href="#i-ajuda"/></svg><span class="menu-txt">Ajuda</span>
+  </a>
+</nav>
+
+<!-- fundo escuro atrás do menu quando ele abre por cima da tela (celular) -->
+<div class="menu-fundo" id="menuFundo"></div>
+
+<div class="conteudo">
+
+<div class="barra-topo">
+  <button type="button" class="menu-toggle" id="menuToggle" aria-controls="menu" aria-expanded="true" aria-label="Recolher menu">
+    <svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg>
+  </button>
+</div>
 
 <main>
 
   <!-- =====================================================================
-       ABA 1 — CONFERÊNCIA DE DDA
+       SEÇÃO 1 — CONFERÊNCIA SANTANDER (conferência de DDA)
        ===================================================================== -->
-  <section class="painel" id="painel-dda">
-    <div class="uploads">
-      <div class="card">
-        <div class="num">Arquivo 1</div>
-        <h2>DDA do Banco</h2>
-        <div class="hint">Beneficiário na coluna B · Valor na coluna E. Cabeçalho na linha 5.</div>
-        <label class="drop" id="dropBanco">
-          <input type="file" id="fileBanco" accept=".xlsx,.xls">
-          <div class="ico">🏦</div>
-          <div class="txt" id="txtBanco">Clique ou arraste o arquivo do banco</div>
-        </label>
+  <section class="painel" id="painel-santander" aria-labelledby="titulo-santander">
+    <header class="tela-cabecalho">
+      <div>
+        <p class="sobretitulo">DDA x Títulos a pagar</p>
+        <h1 id="titulo-santander">Conferência Santander</h1>
       </div>
-      <div class="card">
-        <div class="num">Arquivo 2</div>
-        <h2>Sistema (Títulos a Pagar)</h2>
-        <div class="hint">Nome na coluna C · Saldo na coluna P. Limpeza automática das colunas E–O.</div>
-        <label class="drop" id="dropSis">
-          <input type="file" id="fileSis" accept=".xlsx,.xls">
-          <div class="ico">🗂️</div>
-          <div class="txt" id="txtSis">Clique ou arraste o arquivo do sistema</div>
-        </label>
+      <div class="tela-acoes">
+        <p class="tela-arquivos" id="ddaArquivos">Nenhum arquivo enviado</p>
+        <button type="button" class="btn btn-baixar" data-baixar="dda" disabled>
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
       </div>
+    </header>
+
+    <div class="envio">
+      <label class="drop" id="dropBanco">
+        <input type="file" id="fileBanco" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">DDA do Santander</span>
+        <span class="drop-dica">Excel do Pagador Eletrônico. Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="txtBanco">Nenhum arquivo escolhido</span>
+      </label>
+      <label class="drop" id="dropSis">
+        <input type="file" id="fileSis" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">Títulos a pagar do sistema</span>
+        <span class="drop-dica">Excel do relatório de Títulos a Pagar. Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="txtSis">Nenhum arquivo escolhido</span>
+      </label>
     </div>
 
-    <div class="actions">
-      <button class="btn-go" id="ddaBtnGo" disabled>Conferir</button>
-      <button class="btn-sec oculto" id="ddaBtnXlsx">Baixar resultado (Excel)</button>
-      <button class="btn-sec oculto" id="ddaBtnReset">Nova conferência</button>
+    <div class="acoes">
+      <button type="button" class="btn btn-conferir" id="ddaBtnGo" disabled>Conferir</button>
     </div>
 
-    <div class="erro-box" id="ddaErro"></div>
+    <div class="erro-box" id="ddaErro" role="alert"></div>
 
     <div class="resultado" id="ddaResultado">
-      <div class="resumo">
-        <div class="stat ok">
-          <div class="n" id="ddaNOk">0</div>
-          <div class="l">Conferidos</div>
+      <div class="resumo" id="ddaResumo">
+        <div class="stat g-ok" data-grupo="ok" data-ajuda="conferidos">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Conferidos</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat div">
-          <div class="n" id="ddaNDiv">0</div>
-          <div class="l">Nome divergente</div>
+        <div class="stat g-data" data-grupo="data" data-ajuda="dataDiv">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Data divergente</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat data">
-          <div class="n" id="ddaNData">0</div>
-          <div class="l">Data divergente</div>
+        <div class="stat g-nome" data-grupo="nome" data-ajuda="nomeDiv">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Nome divergente</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat b">
-          <div class="n" id="ddaNBanco">0</div>
-          <div class="l">Só no banco</div>
+        <div class="stat g-banco" data-grupo="banco" data-ajuda="soBanco">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Só no banco</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat s">
-          <div class="n" id="ddaNSis">0</div>
-          <div class="l">Só no sistema</div>
+        <div class="stat g-sis" data-grupo="sis" data-ajuda="soSis">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Só no sistema</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
       </div>
 
-      <section class="bloco">
-        <h3>Nome divergente <span class="tag div">conferir · possível factoring</span></h3>
-        <div id="ddaTblDiv"></div>
-      </section>
+      <div class="tabela-caixa">
+        <div class="tabela-ferramentas">
+          <label class="busca">
+            <svg class="ico" aria-hidden="true"><use href="#i-busca"/></svg>
+            <input type="search" id="ddaBusca" placeholder="Buscar fornecedor, NF ou valor" aria-label="Buscar fornecedor, NF ou valor">
+          </label>
+          <p class="filtro-ativo" id="ddaFiltro" hidden></p>
+        </div>
+        <div class="tabela-rolagem">
+          <table>
+            <thead><tr><th>Status</th><th>Vencimento</th><th>Fornecedor</th><th>NF / documento</th><th class="num">Valor</th></tr></thead>
+            <tbody id="ddaCorpo"></tbody>
+            <tfoot id="ddaRodape"></tfoot>
+          </table>
+        </div>
+      </div>
 
-      <section class="bloco">
-        <h3>Data divergente <span class="tag data">mesmo título · vencimento diferente</span></h3>
-        <div id="ddaTblData"></div>
-      </section>
-
-      <section class="bloco">
-        <h3>Só no banco <span class="tag falta">não achado no sistema</span></h3>
-        <div id="ddaTblBanco"></div>
-      </section>
-
-      <section class="bloco">
-        <h3>Só no sistema <span class="tag falta">não achado no banco</span></h3>
-        <div id="ddaTblSis"></div>
-      </section>
-
-      <section class="bloco">
-        <h3>Conferidos <span class="tag ok">valor e nome batem</span></h3>
-        <div id="ddaTblOk"></div>
-      </section>
+      <div class="acoes acoes-final">
+        <button type="button" class="btn btn-baixar" id="ddaBtnXlsx">
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+        <button type="button" class="btn btn-sec" id="ddaBtnReset">Nova conferência</button>
+      </div>
     </div>
   </section>
 
   <!-- =====================================================================
-       ABA 2 — CONFERÊNCIA DE CÓDIGO DE BARRAS
+       SEÇÃO 2 — CONFERÊNCIA ITAÚ (mesma regra da Santander)
        ===================================================================== -->
-  <section class="painel oculto" id="painel-codigo-barras">
-    <div class="card solo">
-      <div class="num">Arquivo</div>
-      <h2>Títulos a Pagar</h2>
-      <div class="hint">O cabeçalho é detectado automaticamente (linha com "Código de Barras" e "Saldo").</div>
-      <label class="drop" id="cbDrop">
-        <input type="file" id="cbFile" accept=".xlsx,.xls">
-        <div class="ico">📋</div>
-        <div class="txt" id="cbTxt">Clique ou arraste o arquivo de títulos a pagar</div>
+  <section class="painel oculto" id="painel-itau" aria-labelledby="titulo-itau">
+    <header class="tela-cabecalho">
+      <div>
+        <p class="sobretitulo">DDA x Títulos a pagar</p>
+        <h1 id="titulo-itau">Conferência Itaú</h1>
+      </div>
+      <div class="tela-acoes">
+        <p class="tela-arquivos" id="itauArquivos">Nenhum arquivo enviado</p>
+        <button type="button" class="btn btn-baixar" data-baixar="itau" disabled>
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+      </div>
+    </header>
+
+    <div class="envio">
+      <label class="drop" id="itauDropBanco">
+        <input type="file" id="itauFileBanco" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">DDA do Itaú</span>
+        <span class="drop-dica">Excel "Consulta Boletos Recebidos". Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="itauTxtBanco">Nenhum arquivo escolhido</span>
+      </label>
+      <label class="drop" id="itauDropSis">
+        <input type="file" id="itauFileSis" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">Títulos a pagar do sistema</span>
+        <span class="drop-dica">Excel do relatório de Títulos a Pagar. Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="itauTxtSis">Nenhum arquivo escolhido</span>
       </label>
     </div>
 
-    <div class="actions">
-      <button class="btn-go" id="cbBtnGo" disabled>Conferir</button>
-      <button class="btn-sec oculto" id="cbBtnXlsx">Baixar resultado (Excel)</button>
-      <button class="btn-sec oculto" id="cbBtnReset">Nova conferência</button>
+    <div class="acoes">
+      <button type="button" class="btn btn-conferir" id="itauBtnGo" disabled>Conferir</button>
+      <label class="campo">Unidade
+        <select id="itauUnidade">
+          <option value="todas">Todas</option>
+          <option value="matriz">Matriz</option>
+          <option value="capinopolis">Unidade Capinópolis</option>
+        </select>
+      </label>
     </div>
 
-    <div class="erro-box" id="cbErro"></div>
+    <div class="erro-box" id="itauErro" role="alert"></div>
 
-    <div class="resultado" id="cbResultado">
-      <div class="resumo cols-4">
-        <div class="stat">
-          <div class="n" id="cbNTotal">0</div>
-          <div class="l">Títulos com código</div>
+    <div class="resultado" id="itauResultado">
+      <p class="info-consulta" id="itauInfo"></p>
+
+      <div class="resumo" id="itauResumo">
+        <div class="stat g-ok" data-grupo="ok" data-ajuda="conferidos">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Conferidos</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat div">
-          <div class="n" id="cbNDiv">0</div>
-          <div class="l">Divergências</div>
+        <div class="stat g-data" data-grupo="data" data-ajuda="dataDiv">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Data divergente</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat dup">
-          <div class="n" id="cbNDup">0</div>
-          <div class="l">Duplicados</div>
+        <div class="stat g-nome" data-grupo="nome" data-ajuda="nomeDiv">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Nome divergente</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
-        <div class="stat ok">
-          <div class="n" id="cbNOk">0</div>
-          <div class="l">Conferidos OK</div>
+        <div class="stat g-banco" data-grupo="banco" data-ajuda="soBanco">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Só no banco</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+        <div class="stat g-sis" data-grupo="sis" data-ajuda="soSis">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Só no sistema</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
         </div>
       </div>
 
-      <section class="bloco">
-        <h3>Divergências de valor <span class="tag div">código ≠ saldo lançado</span></h3>
-        <div id="cbTblDiv"></div>
+      <div class="tabela-caixa">
+        <div class="tabela-ferramentas">
+          <label class="busca">
+            <svg class="ico" aria-hidden="true"><use href="#i-busca"/></svg>
+            <input type="search" id="itauBusca" placeholder="Buscar fornecedor, NF ou valor" aria-label="Buscar fornecedor, NF ou valor">
+          </label>
+          <p class="filtro-ativo" id="itauFiltro" hidden></p>
+        </div>
+        <div class="tabela-rolagem">
+          <table>
+            <thead><tr><th>Status</th><th>Vencimento</th><th>Fornecedor</th><th>NF / documento</th><th>CNPJ</th><th>Banco</th><th>Código de barras</th><th class="num">Valor (até venc.)</th></tr></thead>
+            <tbody id="itauCorpo"></tbody>
+            <tfoot id="itauRodape"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="acoes acoes-final">
+        <button type="button" class="btn btn-baixar" id="itauBtnXlsx">
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+        <button type="button" class="btn btn-sec" id="itauBtnReset">Nova conferência</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SEÇÃO 3 — CONFERÊNCIA DE CÓDIGO DE BARRAS
+       ===================================================================== -->
+  <section class="painel oculto" id="painel-codigo-barras" aria-labelledby="titulo-cb">
+    <header class="tela-cabecalho">
+      <div>
+        <p class="sobretitulo">Código de barras x Saldo lançado</p>
+        <h1 id="titulo-cb">Código de barras</h1>
+      </div>
+      <div class="tela-acoes">
+        <p class="tela-arquivos" id="cbArquivos">Nenhum arquivo enviado</p>
+        <button type="button" class="btn btn-baixar" data-baixar="cb" disabled>
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+      </div>
+    </header>
+
+    <div class="envio envio-unico">
+      <label class="drop" id="cbDrop">
+        <input type="file" id="cbFile" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">Títulos a pagar com código de barras</span>
+        <span class="drop-dica">Excel com as colunas "Código de Barras" e "Saldo". Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="cbTxt">Nenhum arquivo escolhido</span>
+      </label>
+    </div>
+
+    <div class="acoes">
+      <button type="button" class="btn btn-conferir" id="cbBtnGo" disabled>Conferir</button>
+    </div>
+
+    <div class="erro-box" id="cbErro" role="alert"></div>
+
+    <div class="resultado" id="cbResultado">
+      <div class="resumo" id="cbResumo">
+        <div class="stat g-ok" data-grupo="ok" data-ajuda="cbOk">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Conferidos</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+        <div class="stat g-valor" data-grupo="valor" data-ajuda="cbDiv">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Divergência de valor</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+        <div class="stat g-dup" data-grupo="dup" data-ajuda="cbDup">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Duplicados</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="tabela-caixa">
+        <div class="tabela-ferramentas">
+          <label class="busca">
+            <svg class="ico" aria-hidden="true"><use href="#i-busca"/></svg>
+            <input type="search" id="cbBusca" placeholder="Buscar fornecedor, NF ou valor" aria-label="Buscar fornecedor, NF ou valor">
+          </label>
+          <p class="filtro-ativo" id="cbFiltro" hidden></p>
+        </div>
+        <div class="tabela-rolagem">
+          <table>
+            <thead><tr><th>Status</th><th>Vencimento</th><th>Fornecedor</th><th>Duplicata</th><th>Código de barras</th><th class="num">Valor no código</th><th class="num">Saldo lançado</th><th class="num">Diferença</th></tr></thead>
+            <tbody id="cbCorpo"></tbody>
+            <tfoot id="cbRodape"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="acoes acoes-final">
+        <button type="button" class="btn btn-baixar" id="cbBtnXlsx">
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+        <button type="button" class="btn btn-sec" id="cbBtnReset">Nova conferência</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SEÇÃO 4 — AJUDA
+       ===================================================================== -->
+  <section class="painel oculto" id="painel-ajuda" aria-labelledby="titulo-ajuda">
+    <header class="tela-cabecalho">
+      <div>
+        <p class="sobretitulo">Como usar</p>
+        <h1 id="titulo-ajuda">Ajuda</h1>
+      </div>
+    </header>
+
+    <div class="ajuda">
+      <p class="ajuda-intro">Como usar cada conferência e o que fazer com o resultado. Os arquivos que você escolhe são lidos só no seu computador: nada é enviado para fora.</p>
+
+      <!-- ---------- Conferência Santander ---------- -->
+      <section class="ajuda-bloco">
+        <h2>Conferência Santander</h2>
+
+        <h3>Para que serve</h3>
+        <p>Compara os boletos que o Santander mostra no DDA (a lista de boletos emitidos em nome da empresa) com os títulos lançados no sistema. Mostra o que bate, o que está diferente e o que está faltando de um lado ou do outro.</p>
+
+        <h3>Arquivos que você precisa</h3>
+        <ul>
+          <li><b>DDA do Santander, em Excel.</b> No internet banking do Santander, entre no Pagador Eletrônico (DDA), deixe só os títulos em aberto, escolha o período de vencimento e salve a lista em Excel.</li>
+          <li><b>Títulos a pagar do sistema, em Excel.</b> No sistema da empresa, tire o relatório de Títulos a Pagar do mesmo período e salve em Excel. O nome do fornecedor fica na coluna C e o saldo na coluna P.</li>
+        </ul>
+        <p class="ajuda-dica">Dica: use o mesmo período de vencimento nos dois arquivos. Se um tiver mais dias que o outro, sobram títulos sem par.</p>
+
+        <h3>Passo a passo</h3>
+        <ol>
+          <li>No menu, clique em <b>Conferência Santander</b>.</li>
+          <li>Arraste o DDA do Santander para a primeira caixa (ou clique nela e escolha o arquivo).</li>
+          <li>Faça o mesmo na segunda caixa com o relatório do sistema. O nome de cada arquivo aparece na caixa e no alto da tela.</li>
+          <li>Clique em <b>Conferir</b>.</li>
+          <li>Veja os cartões de resumo: cada um mostra quantos títulos caíram no grupo e o valor total. O <b>?</b> do cartão explica o grupo.</li>
+          <li>Clique num cartão para ver só aquele grupo na tabela; clique de novo para ver tudo. Use a busca para achar um fornecedor, uma NF ou um valor. O total no pé da tabela soma o que está aparecendo.</li>
+          <li>Clique em <b>Baixar resultado (Excel)</b> para ter a planilha, com uma aba para cada grupo.</li>
+          <li>Para conferir outros arquivos, clique em <b>Nova conferência</b>.</li>
+        </ol>
+
+        <h3>O que fazer com cada grupo</h3>
+        <ul class="grupos">
+          <li><span class="status g-ok">Conferido</span> Valor, fornecedor e vencimento batem. Pode seguir com o pagamento.</li>
+          <li><span class="status g-data">Data divergente</span> É o mesmo boleto, mas o vencimento no sistema está diferente do boleto. Acerte a data no sistema ou confirme com o fornecedor qual está certa.</li>
+          <li><span class="status g-nome">Nome divergente</span> O valor é igual, mas o nome do fornecedor no banco é outro. Muitas vezes é factoring (veja as perguntas frequentes). Confirme com o fornecedor antes de pagar.</li>
+          <li><span class="status g-banco">Só no banco</span> O boleto está no banco, mas não há lançamento no sistema. Veja se a nota fiscal chegou e se falta lançar. Se ninguém reconhecer a compra, não pague e fale com o fornecedor.</li>
+          <li><span class="status g-sis">Só no sistema</span> Está lançado no sistema, mas não há boleto no banco. Veja os motivos mais comuns nas perguntas frequentes.</li>
+        </ul>
       </section>
 
-      <section class="bloco">
-        <h3>Códigos duplicados <span class="tag dup">mesmo código em mais de um título</span></h3>
-        <div id="cbTblDup"></div>
+      <!-- ---------- Conferência Itaú ---------- -->
+      <section class="ajuda-bloco">
+        <h2>Conferência Itaú</h2>
+
+        <h3>Para que serve</h3>
+        <p>Faz a mesma conferência do Santander, só que com os boletos do DDA do Itaú. Além disso, mostra o CNPJ do fornecedor, o banco que emitiu o boleto, o código de barras e os boletos com desconto, e deixa separar por unidade.</p>
+
+        <h3>Arquivos que você precisa</h3>
+        <ul>
+          <li><b>DDA do Itaú, em Excel.</b> No internet banking do Itaú, abra a consulta de boletos recebidos (DDA), escolha o período de vencimento e salve em Excel. O arquivo certo é o <b>“Consulta Boletos Recebidos”</b>.</li>
+          <li><b>Títulos a pagar do sistema, em Excel.</b> O mesmo relatório usado na Conferência Santander, do mesmo período.</li>
+        </ul>
+
+        <h3>Passo a passo</h3>
+        <ol>
+          <li>No menu, clique em <b>Conferência Itaú</b>.</li>
+          <li>Arraste o DDA do Itaú para a primeira caixa e o relatório do sistema para a segunda.</li>
+          <li>Em <b>Unidade</b>, deixe <b>Todas</b> ou escolha <b>Matriz</b> ou <b>Unidade Capinópolis</b>.</li>
+          <li>Clique em <b>Conferir</b>.</li>
+          <li>Confira a <b>data e hora da consulta</b> que aparece acima dos cartões. Se o arquivo for antigo, boletos novos podem estar faltando.</li>
+          <li>Use os cartões e a busca do mesmo jeito que na Conferência Santander. Se trocar a unidade, o resultado muda na hora, sem escolher os arquivos de novo.</li>
+          <li>Clique em <b>Baixar resultado (Excel)</b> para ter a planilha, já com CNPJ, banco, código de barras, valor a pagar e unidade.</li>
+        </ol>
+
+        <h3>O que fazer com cada grupo</h3>
+        <ul class="grupos">
+          <li><span class="status g-ok">Conferido</span> Valor, fornecedor e vencimento batem. Pode seguir com o pagamento.</li>
+          <li><span class="status g-data">Data divergente</span> É o mesmo boleto com vencimento diferente no sistema. Acerte a data no sistema.</li>
+          <li><span class="status g-nome">Nome divergente</span> O valor é igual, mas o nome do fornecedor é outro. Use o CNPJ que aparece na tabela para ver quem está cobrando e confirme com o fornecedor antes de pagar.</li>
+          <li><span class="status g-banco">Só no banco</span> O boleto está no banco, mas não no sistema. Veja se falta lançar a nota. Se ninguém reconhecer, não pague.</li>
+          <li><span class="status g-sis">Só no sistema</span> Está no sistema, mas não no banco. Veja as perguntas frequentes. Atenção: ao escolher uma unidade, os títulos da outra unidade também caem aqui, porque o relatório do sistema não separa por unidade.</li>
+          <li><span class="status g-ok">com desconto</span> O boleto tem um valor menor se for pago até uma data. A conferência usa o valor cheio; o valor com desconto aparece ao passar o mouse na etiqueta e na coluna “A pagar” do Excel. Pague dentro do prazo para ganhar o desconto.</li>
+        </ul>
+      </section>
+
+      <!-- ---------- Código de barras ---------- -->
+      <section class="ajuda-bloco">
+        <h2>Código de barras</h2>
+
+        <h3>Para que serve</h3>
+        <p>Confere, título por título, se o valor que está no código de barras do boleto é igual ao saldo lançado no sistema. Também avisa quando o mesmo código de barras foi lançado mais de uma vez, para evitar pagar o mesmo boleto duas vezes.</p>
+
+        <h3>Arquivo que você precisa</h3>
+        <ul>
+          <li><b>Títulos a pagar do sistema, em Excel, com a coluna de código de barras.</b> No sistema da empresa, tire o relatório de Títulos a Pagar que traz as colunas “Código de Barras” e “Saldo” e salve em Excel. Não precisa arrumar nada: a ferramenta acha essas colunas sozinha.</li>
+        </ul>
+        <p class="ajuda-dica">Só entram na conferência os títulos com o código de barras completo. Títulos sem código ou com código pela metade são deixados de fora.</p>
+
+        <h3>Passo a passo</h3>
+        <ol>
+          <li>No menu, clique em <b>Código de barras</b>.</li>
+          <li>Arraste o relatório para a caixa (ou clique nela e escolha o arquivo).</li>
+          <li>Clique em <b>Conferir</b>.</li>
+          <li>Veja os cartões e a tabela. Clique num cartão para ver só aquele grupo e use a busca para achar um fornecedor, uma duplicata ou um valor.</li>
+          <li>Se quiser, clique em <b>Baixar resultado (Excel)</b>. A planilha vem com uma aba para as diferenças de valor e outra para os códigos repetidos.</li>
+        </ol>
+
+        <h3>O que fazer com cada grupo</h3>
+        <ul class="grupos">
+          <li><span class="status g-ok">Conferido</span> O valor do código de barras bate com o saldo. Pode seguir com o pagamento.</li>
+          <li><span class="status g-valor">Divergência de valor</span> O valor do código de barras é diferente do saldo lançado. Veja se o lançamento está errado e corrija, ou peça o boleto certo ao fornecedor. A tabela começa pelas maiores diferenças.</li>
+          <li><span class="status g-dup">Duplicado</span> O mesmo boleto foi lançado mais de uma vez (os títulos repetidos têm o mesmo número de grupo). Apague o lançamento repetido para não pagar duas vezes.</li>
+        </ul>
+      </section>
+
+      <!-- ---------- Tabela de status ---------- -->
+      <section class="ajuda-bloco">
+        <h2>Status e cores</h2>
+        <div class="tabela-rolagem">
+          <table class="tabela-status">
+            <thead><tr><th>Status</th><th>Cor</th><th>O que fazer</th></tr></thead>
+            <tbody>
+              <tr><td><span class="status g-ok">Conferido</span></td><td><span class="bolinha g-ok"></span>Verde</td><td>Nada. Pode pagar.</td></tr>
+              <tr><td><span class="status g-data">Data divergente</span></td><td><span class="bolinha g-data"></span>Âmbar</td><td>Acertar o vencimento no sistema.</td></tr>
+              <tr><td><span class="status g-nome">Nome divergente</span></td><td><span class="bolinha g-nome"></span>Roxo</td><td>Confirmar com o fornecedor quem está cobrando antes de pagar.</td></tr>
+              <tr><td><span class="status g-banco">Só no banco</span></td><td><span class="bolinha g-banco"></span>Vermelho</td><td>Ver se falta lançar a nota. Se ninguém reconhecer, não pagar.</td></tr>
+              <tr><td><span class="status g-sis">Só no sistema</span></td><td><span class="bolinha g-sis"></span>Cinza</td><td>Descobrir por que não há boleto (veja as perguntas frequentes).</td></tr>
+              <tr><td><span class="status g-ok">com desconto</span></td><td><span class="bolinha g-ok"></span>Verde</td><td>Pagar o valor com desconto dentro do prazo (só na Conferência Itaú).</td></tr>
+              <tr><td><span class="status g-valor">Divergência de valor</span></td><td><span class="bolinha g-valor"></span>Âmbar</td><td>Corrigir o saldo lançado ou pedir o boleto certo (Código de barras).</td></tr>
+              <tr><td><span class="status g-dup">Duplicado</span></td><td><span class="bolinha g-dup"></span>Vermelho</td><td>Apagar o lançamento repetido (Código de barras).</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ---------- Perguntas frequentes ---------- -->
+      <section class="ajuda-bloco">
+        <h2>Perguntas frequentes</h2>
+
+        <details>
+          <summary>Por que um título fica “Só no sistema”?</summary>
+          <p>Quer dizer que o título está lançado no sistema, mas não há boleto no banco com o mesmo valor. Os motivos mais comuns:</p>
+          <ul>
+            <li>É uma <b>conta de consumo</b> (luz, água, telefone), que nunca aparece no DDA. Veja a pergunta sobre a Cemig.</li>
+            <li>O título é pago de <b>outro jeito</b>: Pix, transferência, débito automático ou guia de imposto.</li>
+            <li>O fornecedor <b>ainda não emitiu</b> o boleto, ou ele ainda não chegou ao banco.</li>
+            <li>O vencimento no sistema está <b>fora do período</b> que você consultou no banco.</li>
+            <li>O valor foi <b>lançado errado</b> no sistema. Nesse caso, o boleto certo costuma aparecer em “Só no banco”: compare os dois grupos.</li>
+            <li>Na Conferência Itaú, com uma unidade escolhida, os títulos da <b>outra unidade</b> também ficam aqui.</li>
+          </ul>
+        </details>
+
+        <details>
+          <summary>O que é “Nome divergente” (possível factoring)?</summary>
+          <p>É quando o boleto do banco tem o mesmo valor de um título do sistema, mas o nome de quem cobra é diferente.</p>
+          <p>Isso acontece muito com <b>factoring</b>: o fornecedor vende a cobrança para outra empresa (uma factoring ou um banco), e o boleto passa a sair no nome dessa empresa. O pagamento continua sendo da mesma compra.</p>
+          <p>Mas também pode ser só coincidência de valor, ou até um boleto falso. Por isso, antes de pagar, confirme com o fornecedor se ele passou a cobrança para essa empresa.</p>
+        </details>
+
+        <details>
+          <summary>Por que contas de consumo, como a Cemig, não aparecem no DDA?</summary>
+          <p>O DDA só mostra boletos de cobrança, aqueles que um fornecedor registra no banco em nome da empresa.</p>
+          <p>Contas de luz, água, telefone e gás (como Cemig e Algar) são <b>contas de consumo</b>: são pagas por um acordo direto entre a concessionária e os bancos, e não são registradas no DDA. Por isso elas sempre vão ficar em “Só no sistema”, e isso é normal. Confira essas contas pela própria fatura.</p>
+        </details>
+
+        <details>
+          <summary>Por que usar o Excel e não o PDF?</summary>
+          <p>A ferramenta lê as colunas da planilha: vencimento, fornecedor e valor. No Excel, cada informação fica na sua coluna, do jeito que veio do banco ou do sistema.</p>
+          <p>No PDF, tudo vira uma página para imprimir: os números podem sair quebrados, juntos ou na coluna errada, e a conferência não teria como ler com segurança. Por isso, sempre salve os arquivos em Excel (.xlsx ou .xls).</p>
+        </details>
+
+        <details>
+          <summary>O que é o “±” ao lado de um valor?</summary>
+          <p>Uma diferença de até 1 centavo entre o boleto e o sistema conta como o mesmo valor, porque costuma ser só arredondamento. Quando isso acontece, aparece o ± ao lado do valor. Passe o mouse sobre ele para ver o valor do sistema e a diferença.</p>
+        </details>
       </section>
     </div>
   </section>
 
 </main>
 
-<script>
-/* ===================================================================
-   0) NAVEGAÇÃO ENTRE ABAS
-   =================================================================== */
+</div>
 
-const $ = id => document.getElementById(id);
-
-function mostraPainel(nome){
-  document.querySelectorAll('.painel').forEach(p => p.classList.add('oculto'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'));
-  const painel = $('painel-' + nome);
-  const btn = document.querySelector(`.tab-btn[data-tab="${nome}"]`);
-  if(painel) painel.classList.remove('oculto');
-  if(btn) btn.classList.add('ativo');
-}
-function painelDoHash(){
-  return location.hash.replace('#','') === 'codigo-barras' ? 'codigo-barras' : 'dda';
-}
-window.addEventListener('hashchange', () => mostraPainel(painelDoHash()));
-mostraPainel(painelDoHash());
-
-
-/* ===================================================================
-   1) FUNÇÕES COMPARTILHADAS PELAS DUAS FERRAMENTAS
-   =================================================================== */
-
-// formata um número como dinheiro brasileiro: 1234.5 -> "R$ 1.234,50"
-const brl = n => (n===null || n===undefined || isNaN(n)) ? '—' : n.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-
-// transforma qualquer valor (texto ou número) num número limpo com 2 casas.
-// resolve o caso do valor vir como texto tipo "1.234,56"
-function paraNumero(v){
-  if(v===null || v===undefined || v==='') return null;
-  if(typeof v==='number') return Math.round(v*100)/100;
-  let s = String(v).replace(/[R$\s]/g,'')
-                   .replace(/\./g,'')
-                   .replace(',','.');
-  let n = parseFloat(s);
-  return isNaN(n) ? null : Math.round(n*100)/100;
-}
-
-// formata uma data como dd/mm/aaaa, venha ela como texto ou como data
-function formatData(v){
-  if(v===null || v===undefined || v==='') return '';
-  if(v instanceof Date){
-    const d = String(v.getDate()).padStart(2,'0');
-    const m = String(v.getMonth()+1).padStart(2,'0');
-    return `${d}/${m}/${v.getFullYear()}`;
-  }
-  return String(v).trim();
-}
-
-// segurança: evita que caracteres do nome quebrem o HTML
-function escapa(s){
-  return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-}
-
-// abre um Excel e devolve uma matriz: lista de linhas, cada linha uma lista de células
-function lerMatriz(file){
-  return new Promise((res,rej)=>{
-    const fr = new FileReader();
-    fr.onload = e => {
-      try{
-        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        res(XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null}));
-      }catch(err){ rej(err); }
-    };
-    fr.onerror = () => rej(new Error('Não consegui ler o arquivo.'));
-    fr.readAsArrayBuffer(file);
-  });
-}
-
-// prepara uma caixa de upload (clicar OU arrastar arquivo)
-function ligaDrop(dropId, inputId, txtId, onFile){
-  const drop = $(dropId);
-  const inp  = $(inputId);
-  const txt  = $(txtId);
-
-  inp.addEventListener('change', () => { if(inp.files[0]) aceita(inp.files[0]); });
-
-  ['dragover','dragenter'].forEach(ev =>
-    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave','drop'].forEach(ev =>
-    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', e => {
-    const f = e.dataTransfer.files[0];
-    if(f){ inp.files = e.dataTransfer.files; aceita(f); }
-  });
-
-  function aceita(f){
-    drop.classList.add('ok');
-    txt.textContent = '✓ ' + f.name;
-    onFile(f);
-  }
-}
-
-function mostraErro(id, msg){ const e=$(id); e.textContent='⚠ '+msg; e.style.display='block'; }
-function limpaErro(id){ $(id).style.display='none'; }
-
-const BORDA_FINA = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
-
-
-/* ===================================================================
-   2) CONFERÊNCIA DE DDA
-   =================================================================== */
-
-// deixa um nome "padronizado" pra comparar: maiúsculo, sem espaço extra, sem pontuação
-function limpaNome(s){
-  if(s===null || s===undefined) return '';
-  s = String(s).trim().toUpperCase().replace(/\s+/g,' ');
-  s = s.replace(/[.,/\-&]/g,'');
-  return s.replace(/\s+/g,' ').trim();
-}
-
-// decide se dois nomes são "a mesma empresa", mesmo que escritos diferente
-function nomesBatem(a,b){
-  a = limpaNome(a); b = limpaNome(b);
-  if(!a || !b) return false;
-  const [curto,longo] = a.length<=b.length ? [a,b] : [b,a];
-  if(longo.startsWith(curto.slice(0, Math.min(curto.length,10)))) return true;
-  return similaridade(a,b) >= 0.6;
-}
-
-// calcula o quanto dois textos são parecidos (0 = nada, 1 = idênticos)
-function similaridade(a,b){
-  if(a===b) return 1;
-  if(a.length<2 || b.length<2) return 0;
-  const bigramas = s => {
-    const m = new Map();
-    for(let i=0;i<s.length-1;i++){
-      const g = s.substr(i,2);
-      m.set(g,(m.get(g)||0)+1);
-    }
-    return m;
-  };
-  const A = bigramas(a), B = bigramas(b);
-  let inter = 0;
-  A.forEach((c,g)=>{ if(B.has(g)) inter += Math.min(c,B.get(g)); });
-  return (2*inter) / ((a.length-1)+(b.length-1));
-}
-
-// BANCO: dados começam na linha 6 (índice 5). Beneficiário=coluna B(1), Valor=coluna E(4)
-function extraiBanco(m){
-  const out = [];
-  for(let i=5; i<m.length; i++){
-    const linha = m[i] || [];
-    const venc  = linha[0];
-    const nome  = linha[1];
-    const valor = paraNumero(linha[4]);
-    if(valor===null) continue;
-    out.push({ venc: formatData(venc), nome: nome ? String(nome).trim() : '', valor });
-  }
-  return out;
-}
-
-// SISTEMA: dados começam na linha 7 (índice 6). Nome=coluna C(2), Saldo=coluna P(15)
-function extraiSistema(m){
-  const out = [];
-  for(let i=6; i<m.length; i++){
-    const linha = m[i] || [];
-    const venc  = linha[0];
-    const nome  = linha[2];
-    if(nome===null || String(nome).trim()==='') continue;
-    const saldo = paraNumero(linha[15]);
-    if(saldo===null) continue;
-    out.push({ venc: formatData(venc), nome: String(nome).trim(), valor: saldo });
-  }
-  return out;
-}
-
-// diferença de até 1 centavo ainda é considerada "mesmo valor" (evita falso
-// "não bateu" por arredondamento entre o boleto e o lançamento no sistema)
-const TOLERANCIA_VALOR = 0.01;
-function valoresBatem(a, b){
-  return Math.abs(a - b) <= TOLERANCIA_VALOR + 1e-9;
-}
-
-// agrupa os índices de "sis" por valor em centavos, pra achar candidatos a
-// parear sem varrer a lista inteira a cada título do banco (O(1) em vez de O(m))
-function indexaPorValor(sis){
-  const idx = new Map();
-  sis.forEach((s,i) => {
-    const c = Math.round(s.valor*100);
-    if(!idx.has(c)) idx.set(c, []);
-    idx.get(c).push(i);
-  });
-  return idx;
-}
-
-// devolve os índices de "sis" cujo valor está dentro da TOLERANCIA_VALOR,
-// na mesma ordem em que apareceriam numa varredura completa (índice crescente)
-function candidatosPorValor(idx, valor){
-  const centro = Math.round(valor*100);
-  const tol = Math.round(TOLERANCIA_VALOR*100);
-  let out = [];
-  for(let c=centro-tol; c<=centro+tol; c++){
-    const lista = idx.get(c);
-    if(lista) out = out.concat(lista);
-  }
-  return tol>0 ? out.sort((a,b)=>a-b) : out;
-}
-
-function conferir(banco, sistema){
-  const sis = sistema.map(s => ({ ...s, usado:false }));
-  const ban = banco.map(b => ({ ...b, usado:false }));
-  const idxValor = indexaPorValor(sis);
-
-  const ok        = [];
-  const datasDiff = [];
-  const div       = [];
-
-  // acha, entre os candidatos com valor compatível, o primeiro ainda não
-  // usado que também passa no teste extra da camada (nome, data, etc.)
-  function achaPar(b, testeExtra){
-    for(const i of candidatosPorValor(idxValor, b.valor)){
-      const s = sis[i];
-      if(!s.usado && valoresBatem(s.valor,b.valor) && testeExtra(s)) return i;
-    }
-    return -1;
-  }
-
-  // Camada 1: valor + nome + vencimento (tudo bate) -> CONFERIDO
-  ban.forEach(b => {
-    const i = achaPar(b, s => nomesBatem(b.nome,s.nome) && mesmaData(b.venc,s.venc));
-    if(i>=0){ sis[i].usado = true; b.usado = true; ok.push({ banco:b, sistema:sis[i] }); }
-  });
-
-  // Camada 2: valor + nome batem, mas a DATA é diferente -> DATA DIVERGENTE
-  ban.forEach(b => {
-    if(b.usado) return;
-    const i = achaPar(b, s => nomesBatem(b.nome,s.nome));
-    if(i>=0){ sis[i].usado = true; b.usado = true; datasDiff.push({ banco:b, sistema:sis[i] }); }
-  });
-
-  // Camada 3: só o valor bate (nome diferente) -> NOME DIVERGENTE
-  ban.forEach(b => {
-    if(b.usado) return;
-    const i = achaPar(b, () => true);
-    if(i>=0){ sis[i].usado = true; b.usado = true; div.push({ banco:b, sistema:sis[i] }); }
-  });
-
-  const soBanco = ban.filter(b => !b.usado);
-  const soSis   = sis.filter(s => !s.usado);
-
-  return { ok, div, soBanco, soSis, datasDiff };
-}
-
-function mesmaData(a, b){
-  const so = s => (s ? String(s).match(/\d+/g) || [] : []).join('-');
-  const A = so(a), B = so(b);
-  if(!A || !B) return true;
-  return A === B;
-}
-
-function tabelaPares(dados, destaque){
-  if(!dados.length) return '<p class="vazio">Nenhum registro nesta categoria.</p>';
-  let h = '<table><thead><tr><th>Valor</th><th>Nome no banco</th><th></th><th>Nome no sistema</th></tr></thead><tbody>';
-  dados.forEach(d => {
-    const diff = Math.round((d.banco.valor - d.sistema.valor)*100)/100;
-    const sinal = diff>0 ? '+' : '';
-    const valorCel = diff===0
-      ? brl(d.banco.valor)
-      : `${brl(d.banco.valor)} <span class="tol" title="Sistema: ${brl(d.sistema.valor)} (dif. ${sinal}${brl(diff)})">±</span>`;
-    h += `<tr class="${destaque?'row-div':''}">
-      <td class="val">${valorCel}</td>
-      <td>${escapa(d.banco.nome)}</td>
-      <td class="arrow">≠</td>
-      <td>${escapa(d.sistema.nome)}</td></tr>`;
-  });
-  return h + '</tbody></table>';
-}
-
-function tabelaSimples(dados){
-  if(!dados.length) return '<p class="vazio">Nenhum registro nesta categoria — tudo certo aqui.</p>';
-  let h = '<table><thead><tr><th>Valor</th><th>Nome</th></tr></thead><tbody>';
-  dados.forEach(d => { h += `<tr><td class="val">${brl(d.valor)}</td><td>${escapa(d.nome)}</td></tr>`; });
-  return h + '</tbody></table>';
-}
-
-function tabelaDatas(dados){
-  if(!dados.length) return '<p class="vazio">Nenhuma data divergente — as datas batem em tudo que casou.</p>';
-  let h = '<table><thead><tr><th>Valor</th><th>Nome</th><th>Data no DDA (boleto)</th><th>Data no sistema (lançada)</th></tr></thead><tbody>';
-  dados.forEach(d => {
-    h += `<tr class="row-data">
-      <td class="val">${brl(d.sistema.valor)}</td>
-      <td>${escapa(d.sistema.nome)}</td>
-      <td class="val">${escapa(d.banco.venc)}</td>
-      <td class="val">${escapa(d.sistema.venc)}</td></tr>`;
-  });
-  return h + '</tbody></table>';
-}
-
-let arqBanco = null, arqSis = null, ddaUltimo = null;
-
-function ddaCheca(){ $('ddaBtnGo').disabled = !(arqBanco && arqSis); }
-ligaDrop('dropBanco','fileBanco','txtBanco', f => { arqBanco = f; ddaCheca(); });
-ligaDrop('dropSis','fileSis','txtSis', f => { arqSis = f; ddaCheca(); });
-
-$('ddaBtnGo').addEventListener('click', async () => {
-  limpaErro('ddaErro');
-  try{
-    const [mB, mS] = await Promise.all([lerMatriz(arqBanco), lerMatriz(arqSis)]);
-    const banco   = extraiBanco(mB);
-    const sistema = extraiSistema(mS);
-
-    if(!banco.length)   throw new Error('Não encontrei valores no arquivo do banco. Confira se o cabeçalho está na linha 5 e os valores na coluna E.');
-    if(!sistema.length) throw new Error('Não encontrei saldos no arquivo do sistema. Confira se os nomes estão na coluna C e o saldo na coluna P.');
-
-    const r = conferir(banco, sistema);
-    ddaUltimo = r;
-
-    $('ddaNOk').textContent    = r.ok.length;
-    $('ddaNDiv').textContent   = r.div.length;
-    $('ddaNData').textContent  = r.datasDiff.length;
-    $('ddaNBanco').textContent = r.soBanco.length;
-    $('ddaNSis').textContent   = r.soSis.length;
-
-    $('ddaTblDiv').innerHTML   = tabelaPares(r.div, true);
-    $('ddaTblData').innerHTML  = tabelaDatas(r.datasDiff);
-    $('ddaTblBanco').innerHTML = tabelaSimples(r.soBanco);
-    $('ddaTblSis').innerHTML   = tabelaSimples(r.soSis);
-    $('ddaTblOk').innerHTML    = tabelaPares(r.ok, false);
-
-    $('ddaResultado').style.display = 'block';
-    $('ddaBtnXlsx').classList.remove('oculto');
-    $('ddaBtnReset').classList.remove('oculto');
-    $('ddaResultado').scrollIntoView({behavior:'smooth', block:'start'});
-  }catch(err){
-    mostraErro('ddaErro', err.message || 'Erro ao processar os arquivos.');
-  }
-});
-
-$('ddaBtnReset').addEventListener('click', () => location.reload());
-
-const COLS_PADRAO = [
-  { cab:'Vencimento',        w:14 },
-  { cab:'Nome/Beneficiário', w:46 },
-  { cab:'Para NF',           w:16 },
-  { cab:'Pedidos',           w:16 },
-  { cab:'Valor',             w:16, fmt:'R$ #,##0.00' },
-];
-const COLS_DATAS = [
-  { cab:'Nome/Beneficiário',            w:46 },
-  { cab:'Valor',                        w:16, fmt:'R$ #,##0.00' },
-  { cab:'Data no DDA (boleto)',         w:20 },
-  { cab:'Data no sistema (lançada)',    w:24 },
-];
-const COLS_DIV = [
-  { cab:'Vencimento',      w:14 },
-  { cab:'Nome no banco',   w:40 },
-  { cab:'Nome no sistema', w:40 },
-  { cab:'Para NF',         w:16 },
-  { cab:'Pedidos',         w:16 },
-  { cab:'Valor',           w:16, fmt:'R$ #,##0.00' },
-];
-
-function montaAbaDda(wb, nomeAba, titulo, colunas, linhas){
-  const ws = wb.addWorksheet(nomeAba);
-  ws.columns = colunas.map(c => ({ width:c.w }));
-  const ncols = colunas.length;
-  const ultimaCol = String.fromCharCode(64 + ncols);
-
-  ws.mergeCells(`A1:${ultimaCol}1`);
-  const t = ws.getCell('A1');
-  t.value = titulo;
-  t.font = { bold:true, size:13, color:{argb:'FFFFFFFF'} };
-  t.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF12283A'} };
-  t.alignment = { vertical:'middle', horizontal:'left', indent:1 };
-  ws.getRow(1).height = 22;
-
-  const cab = ws.getRow(2);
-  cab.values = colunas.map(c => c.cab);
-  cab.eachCell(c => {
-    c.font = { bold:true, color:{argb:'FF12283A'} };
-    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFEDE7DA'} };
-    c.alignment = { vertical:'middle', horizontal:'center' };
-    c.border = BORDA_FINA;
-  });
-  cab.height = 18;
-
-  linhas.forEach(vals => {
-    const r = ws.addRow(vals);
-    r.eachCell({ includeEmpty:true }, c => { c.border = BORDA_FINA; });
-    colunas.forEach((c, i) => {
-      if(c.fmt){ r.getCell(i+1).numFmt = c.fmt; r.getCell(i+1).alignment = { horizontal:'right' }; }
-    });
-  });
-
-  if(linhas.length === 0){
-    ws.mergeCells(`A3:${ultimaCol}3`);
-    ws.getCell('A3').value = 'Nenhum registro nesta categoria.';
-    ws.getCell('A3').font = { italic:true, color:{argb:'FF5C6B78'} };
-  }
-  return ws;
-}
-
-$('ddaBtnXlsx').addEventListener('click', async () => {
-  if(!ddaUltimo) return;
-
-  const wb = new ExcelJS.Workbook();
-
-  const linhaPadrao = (venc, nome, valor) => [ venc || '', nome || '', '', '', valor ];
-  const linhaDiv = (venc, nomeBanco, nomeSistema, valor) =>
-    [ venc || '', nomeBanco || '', nomeSistema || '', '', '', valor ];
-
-  montaAbaDda(wb, 'Nome divergente', 'Nome divergente (conferir · possível factoring)', COLS_DIV,
-           ddaUltimo.div.map(d => linhaDiv(d.sistema.venc, d.banco.nome, d.sistema.nome, d.sistema.valor)));
-
-  montaAbaDda(wb, 'Datas divergentes', 'Datas divergentes (mesmo título, vencimento diferente)', COLS_DATAS,
-           ddaUltimo.datasDiff.map(d => [ d.sistema.nome, d.sistema.valor, d.banco.venc, d.sistema.venc ]));
-
-  montaAbaDda(wb, 'So no banco', 'Só no banco (não achado no sistema)', COLS_PADRAO,
-           ddaUltimo.soBanco.map(d => linhaPadrao(d.venc, d.nome, d.valor)));
-  montaAbaDda(wb, 'So no sistema', 'Só no sistema (não achado no banco)', COLS_PADRAO,
-           ddaUltimo.soSis.map(d => linhaPadrao(d.venc, d.nome, d.valor)));
-  montaAbaDda(wb, 'Conferidos', 'Conferidos (valor e nome batem)', COLS_PADRAO,
-           ddaUltimo.ok.map(d => linhaPadrao(d.sistema.venc, d.sistema.nome, d.sistema.valor)));
-
-  const buffer = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'conferencia-dda.xlsx';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-
-/* ===================================================================
-   3) CONFERÊNCIA DE CÓDIGO DE BARRAS
-   =================================================================== */
-
-// maiúsculo, sem acento, sem espaço nas pontas — pra comparar cabeçalhos
-function normaliza(s){
-  if(s===null || s===undefined) return '';
-  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
-}
-
-// deixa só os dígitos de um código de barras (tira ponto, espaço, etc.)
-function apenasDigitos(v){
-  if(v===null || v===undefined) return '';
-  return String(v).replace(/\D+/g,'');
-}
-
-// linha digitável de boleto: o valor são os ÚLTIMOS 10 dígitos, em centavos
-function valorDoCodigoBarras(digitos){
-  const ult10 = digitos.slice(-10);
-  const n = parseInt(ult10,10);
-  return isNaN(n) ? null : Math.round(n)/100;
-}
-
-// procura a linha que tem, ao mesmo tempo, uma célula com "CÓDIGO DE BARRAS"
-// (o subtítulo do relatório só tem "Cód. Barras" abreviado, então exigir a
-// palavra completa "CODIGO" evita pegar essa linha errada) e uma com "SALDO".
-function acharCabecalho(m){
-  for(let i=0;i<m.length;i++){
-    const linha = m[i] || [];
-    let temCodBarras = false, temSaldo = false;
-    linha.forEach(cel=>{
-      const n = normaliza(cel);
-      if(n.includes('CODIGO') && n.includes('BARRA')) temCodBarras = true;
-      if(n.includes('SALDO')) temSaldo = true;
-    });
-    if(temCodBarras && temSaldo) return i;
-  }
-  return -1;
-}
-
-// mapeia as colunas pelo texto do cabeçalho; usa fallback fixo se não achar
-function mapeiaColunas(linhaCab){
-  const cols = { venc:-1, cliente:-1, nome:-1, duplicata:-1, barra:-1, saldo:-1 };
-  (linhaCab || []).forEach((cel,i)=>{
-    const n = normaliza(cel);
-    if(cols.barra<0      && n.includes('BARRA'))     cols.barra = i;
-    if(cols.saldo<0      && n.includes('SALDO'))      cols.saldo = i;
-    if(cols.venc<0        && n.includes('VENC'))        cols.venc = i;
-    if(cols.duplicata<0 && n.includes('DUPLICATA')) cols.duplicata = i;
-    if(cols.cliente<0    && n.includes('CLIENTE'))    cols.cliente = i;
-  });
-  cols.nome = cols.cliente>=0 ? cols.cliente+1 : -1;
-
-  // fallback fixo: A=Vencto, B=Cliente, C=Nome, D=Duplicata, K=Código de barras, L=Saldo
-  if(cols.venc<0)       cols.venc = 0;
-  if(cols.nome<0)       cols.nome = 2;
-  if(cols.duplicata<0)  cols.duplicata = 3;
-  if(cols.barra<0)      cols.barra = 10;
-  if(cols.saldo<0)       cols.saldo = 11;
-  return cols;
-}
-
-// extrai os títulos com código de barras válido (>=40 dígitos) e saldo numérico
-function extraiTitulos(m, cols, headerIdx){
-  const out = [];
-  for(let i=headerIdx+1; i<m.length; i++){
-    const linha = m[i] || [];
-    const saldo = paraNumero(linha[cols.saldo]);
-    if(saldo===null) continue;
-    const digitos = apenasDigitos(linha[cols.barra]);
-    if(digitos.length<40) continue;
-    out.push({
-      venc: formatData(linha[cols.venc]),
-      nome: linha[cols.nome]!=null ? String(linha[cols.nome]).trim() : '',
-      duplicata: linha[cols.duplicata]!=null ? String(linha[cols.duplicata]).trim() : '',
-      codigo: digitos,
-      valorCodigo: valorDoCodigoBarras(digitos),
-      saldo,
-    });
-  }
-  return out;
-}
-
-function achaDivergencias(titulos){
-  return titulos
-    .map(t => ({ ...t, diff: Math.round((t.valorCodigo - t.saldo)*100)/100 }))
-    .filter(t => Math.abs(t.diff) >= 0.005)
-    .sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
-}
-
-function achaDuplicados(titulos){
-  const porCodigo = new Map();
-  titulos.forEach(t => {
-    if(!porCodigo.has(t.codigo)) porCodigo.set(t.codigo, []);
-    porCodigo.get(t.codigo).push(t);
-  });
-  const grupos = [];
-  porCodigo.forEach(lista => { if(lista.length>1) grupos.push(lista); });
-  return grupos;
-}
-
-function tabelaDivergencias(dados){
-  if(!dados.length) return '<p class="vazio">Nenhuma divergência de valor encontrada — tudo certo aqui.</p>';
-  let h = '<table><thead><tr><th>Vencto.</th><th>Nome</th><th>Duplicata</th><th>Código de barras</th><th>Valor no código</th><th>Saldo lançado</th><th>Diferença</th></tr></thead><tbody>';
-  dados.forEach(t => {
-    const sinal = t.diff>=0 ? '+' : '';
-    h += `<tr class="row-div">
-      <td class="val">${escapa(t.venc)}</td>
-      <td>${escapa(t.nome)}</td>
-      <td>${escapa(t.duplicata)}</td>
-      <td class="cod">${escapa(t.codigo)}</td>
-      <td class="val">${brl(t.valorCodigo)}</td>
-      <td class="val">${brl(t.saldo)}</td>
-      <td class="val diff">${sinal}${brl(t.diff)}</td></tr>`;
-  });
-  return h + '</tbody></table>';
-}
-
-function tabelaDuplicados(grupos){
-  if(!grupos.length) return '<p class="vazio">Nenhum código duplicado encontrado — tudo certo aqui.</p>';
-  let h = '<table><thead><tr><th>Grupo</th><th>Vencto.</th><th>Nome</th><th>Duplicata</th><th>Código de barras</th><th>Saldo lançado</th></tr></thead><tbody>';
-  grupos.forEach((lista,gi) => {
-    lista.forEach((t,ti) => {
-      h += `<tr class="${ti===0 && gi>0 ? 'grupo-inicio' : ''}">`;
-      if(ti===0) h += `<td class="val" rowspan="${lista.length}">Grupo ${gi+1}</td>`;
-      h += `<td class="val">${escapa(t.venc)}</td>
-        <td>${escapa(t.nome)}</td>
-        <td>${escapa(t.duplicata)}</td>
-        <td class="cod">${escapa(t.codigo)}</td>
-        <td class="val">${brl(t.saldo)}</td></tr>`;
-    });
-  });
-  return h + '</tbody></table>';
-}
-
-let cbArquivo = null, cbUltimo = null;
-
-ligaDrop('cbDrop','cbFile','cbTxt', f => { cbArquivo = f; $('cbBtnGo').disabled = false; });
-
-$('cbBtnGo').addEventListener('click', async () => {
-  limpaErro('cbErro');
-  try{
-    const m = await lerMatriz(cbArquivo);
-
-    const headerIdx = acharCabecalho(m);
-    if(headerIdx<0) throw new Error('Não encontrei a linha de cabeçalho (preciso de uma linha com "Código de Barras" e "Saldo" juntos).');
-
-    const cols = mapeiaColunas(m[headerIdx]);
-    const titulos = extraiTitulos(m, cols, headerIdx);
-    if(!titulos.length) throw new Error('Não encontrei títulos com código de barras válido (40+ dígitos) e saldo numérico.');
-
-    const divergencias = achaDivergencias(titulos);
-    const duplicados = achaDuplicados(titulos);
-    const qtdDuplicados = duplicados.reduce((n,g) => n+g.length, 0);
-
-    cbUltimo = { titulos, divergencias, duplicados };
-
-    $('cbNTotal').textContent = titulos.length;
-    $('cbNDiv').textContent    = divergencias.length;
-    $('cbNDup').textContent    = qtdDuplicados;
-    $('cbNOk').textContent     = titulos.length - divergencias.length;
-
-    $('cbTblDiv').innerHTML = tabelaDivergencias(divergencias);
-    $('cbTblDup').innerHTML = tabelaDuplicados(duplicados);
-
-    $('cbResultado').style.display = 'block';
-    $('cbBtnXlsx').classList.remove('oculto');
-    $('cbBtnReset').classList.remove('oculto');
-    $('cbResultado').scrollIntoView({behavior:'smooth', block:'start'});
-  }catch(err){
-    mostraErro('cbErro', err.message || 'Erro ao processar o arquivo.');
-  }
-});
-
-$('cbBtnReset').addEventListener('click', () => location.reload());
-
-const AZUL_CAB = 'FF1F4E8C';
-const BRANCO = 'FFFFFFFF';
-
-function montaAbaCb(wb, nome, colunas, linhas){
-  const ws = wb.addWorksheet(nome);
-  ws.columns = colunas;
-  ws.views = [{ state:'frozen', ySplit:1 }];
-
-  const cab = ws.getRow(1);
-  cab.eachCell(c => {
-    c.font = { bold:true, color:{argb:BRANCO} };
-    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:AZUL_CAB} };
-    c.alignment = { vertical:'middle', horizontal:'center' };
-    c.border = BORDA_FINA;
-  });
-  cab.height = 20;
-
-  if(!linhas.length){
-    ws.mergeCells(2,1,2,colunas.length);
-    ws.getCell(2,1).value = 'Nenhum registro nesta categoria.';
-    ws.getCell(2,1).font = { italic:true, color:{argb:'FF5C6B78'} };
-    return ws;
-  }
-
-  linhas.forEach(obj => {
-    const r = ws.addRow(obj);
-    r.eachCell({ includeEmpty:true }, c => { c.border = BORDA_FINA; });
-  });
-
-  colunas.forEach(c => {
-    if(c.fmt){
-      const col = ws.getColumn(c.key);
-      col.numFmt = c.fmt;
-      col.alignment = { horizontal:'right' };
-    }
-  });
-
-  return ws;
-}
-
-$('cbBtnXlsx').addEventListener('click', async () => {
-  if(!cbUltimo) return;
-
-  const wb = new ExcelJS.Workbook();
-
-  const COLS_DIV_CB = [
-    { header:'Vencto.',           key:'venc',        width:14 },
-    { header:'Nome',              key:'nome',         width:40 },
-    { header:'Duplicata',         key:'duplicata',   width:16 },
-    { header:'Código de barras',  key:'codigo',        width:50 },
-    { header:'Valor no código',   key:'valorCodigo', width:18, fmt:'R$ #,##0.00' },
-    { header:'Saldo lançado',     key:'saldo',        width:18, fmt:'R$ #,##0.00' },
-    { header:'Diferença',         key:'diff',          width:16, fmt:'R$ #,##0.00' },
-  ];
-  const COLS_DUP_CB = [
-    { header:'Grupo',             key:'grupo',        width:10 },
-    { header:'Vencto.',           key:'venc',           width:14 },
-    { header:'Nome',              key:'nome',            width:40 },
-    { header:'Duplicata',         key:'duplicata',      width:16 },
-    { header:'Código de barras',  key:'codigo',           width:50 },
-    { header:'Saldo lançado',     key:'saldo',           width:18, fmt:'R$ #,##0.00' },
-  ];
-
-  montaAbaCb(wb, 'Divergências de Valor', COLS_DIV_CB, cbUltimo.divergencias);
-
-  const linhasDup = cbUltimo.duplicados.flatMap((lista,gi) =>
-    lista.map(t => ({ ...t, grupo: gi+1 })));
-  montaAbaCb(wb, 'Códigos Duplicados', COLS_DUP_CB, linhasDup);
-
-  const buffer = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'Conferencia_Codigo_Barras.xlsx';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>
