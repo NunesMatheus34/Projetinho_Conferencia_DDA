@@ -1,11 +1,12 @@
 # Conferência DDA
 
-Aplicação web simples para o contas a pagar. Roda 100% no navegador, sem servidor, sem build e sem frameworks. Tem **três conferências** e uma página de **Ajuda**, num menu lateral:
+Aplicação web simples para o contas a pagar. Roda 100% no navegador, sem servidor, sem build e sem frameworks. Tem **quatro conferências** e uma página de **Ajuda**, num menu lateral:
 
 - **Conferência Santander**: compara o DDA (Débito Direto Autorizado) do Santander com os títulos a pagar do sistema.
 - **Conferência Itaú**: a mesma conferência com o DDA do Itaú, com CNPJ, banco emissor, código de barras, boletos com desconto e filtro por unidade.
 - **Código de barras**: compara o valor gravado no código de barras de cada título com o saldo lançado no sistema e aponta códigos lançados mais de uma vez.
-- **Ajuda**: passo a passo de cada conferência, o que fazer com cada grupo, tabela de status e perguntas frequentes.
+- **Conferência de Boletos**: acha no DDA do Itaú o boleto de cada título em aberto do sistema e entrega a linha digitável pronta para copiar, só depois de conferir o código. Junta notas pagas por um boleto só e separa o que precisa ser verificado antes de pagar.
+- **Ajuda**: passo a passo de cada conferência, o que fazer com cada grupo ou caso, tabela de status e perguntas frequentes.
 
 ## Como usar
 
@@ -16,9 +17,10 @@ Cada seção tem seu endereço, então dá pra abrir direto numa delas, e o bot�
 - `index.html#santander`: Conferência Santander (o antigo `#dda` também abre aqui)
 - `index.html#itau`: Conferência Itaú
 - `index.html#codigo-barras`: Código de barras
+- `index.html#boletos`: Conferência de Boletos
 - `index.html#ajuda`: Ajuda
 
-Todas as conferências seguem a mesma ordem na tela:
+As conferências seguem a mesma ordem na tela (a Conferência de Boletos usa 3 abas no lugar dos grupos; veja a seção dela):
 
 1. Envie os arquivos Excel (clicando na caixa ou arrastando o arquivo). O nome do arquivo aparece na caixa e no alto da tela.
 2. Clique em **Conferir**.
@@ -107,11 +109,126 @@ Grupos:
 
 ---
 
+## Conferência de Boletos
+
+Você envia o **DDA do Itaú** e o relatório **"Duplicatas em Aberto Modelo A"** do sistema, da **mesma empresa** e do **mesmo dia**. Para cada título em aberto, a página acha o boleto no DDA e entrega a **linha digitável pronta para copiar**, só depois de conferir o código. O resultado vem em **3 abas**, iguais na tela e no Excel.
+
+### Arquivos esperados
+
+| Arquivo | Como é lido |
+| --- | --- |
+| DDA do Itaú | O mesmo "Consulta Boletos Recebidos" da Conferência Itaú (leitor `leitorItau`). O código de barras é lido do **texto** da célula, nunca como número. Das primeiras linhas saem a Data/Hora da consulta, o nome da empresa e o CNPJ. |
+| Duplicatas em Aberto Modelo A | Cabeçalho achado pelo conteúdo (a linha com "Código de barras" e "Saldo", como na tela Código de barras). Colunas: Vencto., Cliente (código do fornecedor), nome (a coluna logo à direita de Cliente), Duplicata (NF), Prf, Código de barras e Saldo. Só entram linhas com código do fornecedor **numérico** (subtotais e totais ficam de fora). Do topo saem o código da empresa (célula A1), a Data/Hora do relatório (linha 1) e o "Período". |
+
+### Checagens dos arquivos (no topo, antes do resultado)
+
+- **Mesma data**: a Data/Hora da consulta do DDA e a do relatório têm que ser do mesmo dia; se não forem, aparece um aviso.
+- **Mesma empresa**: mostra o código da empresa do relatório e o nome/CNPJ do DDA. Se menos de **10%** dos boletos do DDA (dentro do período) casarem com o sistema, contando os códigos já lançados, aparece o alerta grande "Os arquivos podem ser de empresas diferentes".
+- **Período**: mostra o período do relatório e quantos boletos do DDA vencem fora dele. Se o período começa numa **segunda-feira**, os boletos de sábado e domingo anteriores entram também, com a data original.
+
+As checagens só avisam: não mudam o resultado.
+
+### Títulos que já têm código no sistema
+
+Ficam fora do pareamento. O código deles passa pelas mesmas conferências da linha digitável (abaixo) e é procurado no DDA:
+
+- válido e igual a um boleto do DDA: vai para **Com boleto**, marcado "código já lançado no sistema" (ou para a **Verificação**, se tiver algum aviso);
+- inválido, ilegível, repetido em dois títulos ou fora do DDA: vai para a **Verificação**, com "use o do DDA" e a linha correta do DDA quando houver. O código do sistema **nunca** é corrigido automaticamente;
+- conta de consumo (começa com 8): vai para **Sem boleto**, marcada "Conta de consumo".
+
+### Regras de pareamento
+
+**1. Um para um.** Um título e um boleto casam com **pelo menos 2 destes 3 sinais**:
+
+- **Nome**: alguma palavra relevante em comum, comparando as **5 primeiras letras** de palavras com 4 letras ou mais. Não contam:
+  - as palavras da lista fixa `PALAVRAS_IGNORADAS` (LTDA, SA, ME, EPP, EIRELI, COMERCIO, INDUSTRIA, BRASIL, PECAS, SERVICOS e palavras de ramo como ALIMENTOS, TRANSPORTES, MOTORES, TINTAS…), também comparadas pelas 5 primeiras letras, o que pega singular e plural;
+  - as palavras **genéricas desta conferência**: uma palavra que aparece no nome de **3 ou mais fornecedores diferentes** do mesmo arquivo (por exemplo, o nome de uma cidade).
+- **NF**: o número da NF, sem zeros à esquerda e com **3 dígitos ou mais**, aparece nos dígitos do Nº Doc. do boleto. NF com 1 ou 2 dígitos não conta.
+- **Valor**: igual **ao centavo** ao "Até Venc." ou ao "A Pagar".
+
+Só o valor batendo **nunca** casa. Os pares são escolhidos do mais forte para o mais fraco (3 sinais antes de 2; no empate, o vencimento mais próximo). Cada título e cada boleto entram em um par só.
+
+**2. Boleto agrupado.** Para cada boleto livre, do maior valor para o menor, a página junta os títulos ainda sem par cujo nome começa com as **mesmas 5 letras** do beneficiário. Também entram os títulos que bateram só NF e nome, com valor diferente. Ela então procura **2 ou mais** títulos cuja soma dê **exatamente** o valor do boleto, ao centavo.
+
+- A soma usa programação dinâmica em centavos (`somaExata`): para cada soma, guarda de onde ela veio e quantas combinações chegam nela.
+- Dá preferência às notas cuja NF aparece no Nº Doc. do boleto.
+- Só agrupa quando a combinação é **a única**. Se houver mais de uma, ou notas demais para conferir, o boleto vai **sozinho** para a Verificação ("boleto agrupado ambíguo"), com as notas candidatas, e nenhuma nota é marcada como paga por ele.
+
+**3. O resto** é "Sem boleto" (título sem par) ou "Boleto no DDA sem título no sistema" (na Verificação).
+
+### O que vai para a Verificação
+
+Um par só fica em **Com boleto** se não tiver nenhum destes motivos. A coluna "O que verificar" diz qual é:
+
+| Motivo | Quando |
+| --- | --- |
+| Boleto único: a soma das N NFs abaixo dá R$ X. Pagar uma vez só. | boleto agrupado (linha azul, com as NFs logo abaixo) |
+| boleto agrupado ambíguo | mais de uma combinação de notas dá o valor do boleto |
+| título cedido a factoring/fundo | boleto em nome de outra empresa (3 primeiras letras do primeiro nome diferentes, ou o nome não bateu) com FOMENTO, FIDC, FUNDO, FACTORING, CRED…, COBRAN… ou SECURITIZ… |
+| confirmar se é o mesmo fornecedor | boleto em nome de outra empresa, sem essas palavras |
+| Desconto/abatimento: pagar R$ X | "A Pagar" diferente de "Até Venc." |
+| Valor diferente: boleto R$ X x sistema R$ Y | bateram NF e nome, mas não o valor, e não virou grupo |
+| vencimento do código diferente do DDA (boleto prorrogado?) | o vencimento gravado no código não é o "Venc." do DDA |
+| possível pagamento em duplicidade | mesmo fornecedor e mesmo valor em NFs diferentes, ou a mesma linha digitável em mais de um lugar (as notas de um mesmo boleto agrupado não contam) |
+| Boleto no DDA sem título no sistema | boleto que não casou com nenhum título |
+| código digitado no sistema … use o do DDA | código do sistema inválido, ilegível ou fora do DDA |
+| Bloqueado | código do DDA reprovado nas travas abaixo |
+
+### Travas de segurança da linha digitável
+
+1. **Leitura em texto.** O Excel é lido com `lerMatrizComTexto`: para o código de barras usa o texto da célula, nunca `Number`, porque o JavaScript arredonda depois do 15º dígito sem dar erro. Célula de código que não está gravada como texto (número, data) e código em notação científica (ex.: `3,4191E+43`) são **bloqueados como ilegíveis**.
+2. **`validaBoleto`** (seção **BOLETO** do `app.js`). Para ser aceito, o código passa em **tudo**:
+   - a) exatamente 44 dígitos (código de barras) ou 47 (linha digitável, convertida para 44);
+   - b) DV geral módulo 11 e os 3 DVs de campo módulo 10 certos;
+   - c) ida e volta: `linhaParaBarras(barrasParaLinha(cb)) === cb`;
+   - d) banco do código = coluna Banco do DDA, e valor do código = "Até Venc." ao centavo.
+
+   Vencimento diferente não bloqueia, mas vai para a Verificação. O vencimento é calculado pelo fator a partir de 22/02/2025 (fator 1000). Código que começa com 8 é conta de consumo e não é validado como boleto.
+3. **Bloqueado = sem linha.** Código reprovado não tem linha digitável, não tem botão Copiar e nunca vai para "Com boleto"; aparece em vermelho com o motivo.
+4. **Conferência visual.** Ao lado de cada linha digitável aparecem o banco, o valor e o vencimento **lidos do próprio código**.
+5. **Copiar** usa só `navigator.clipboard.writeText` (os 47 dígitos), sem seleção manual. Se o navegador não deixar, o botão mostra "Não copiou".
+6. **Excel conferido.** Código de barras, linha digitável e NF vão como texto (`'@'`). Antes de liberar o download, a página relê o Excel gerado e compara cada linha digitável e código de barras com os da tela. Se algum for diferente, o download é cancelado e o erro aparece na tela.
+7. **O código do sistema nunca é alterado**: quando está errado, a página só avisa e mostra o do DDA.
+
+Mesmo assim: **na hora de pagar, confira no banco se o beneficiário e o valor batem com a planilha.**
+
+### Abas, status e Excel
+
+| Aba | Colunas | O que entra |
+| --- | --- | --- |
+| Com boleto | Cód. Fornecedor, Fornecedor, NF, Valor, Código de Barras, Linha Digitável | pares um para um sem nenhuma pendência, por fornecedor e NF, com total |
+| Verificação | as mesmas + O que verificar | agrupados (azul, com as NFs em azul claro logo abaixo, sem repetir a linha digitável), depois os casos a conferir (amarelo) e os bloqueados (vermelho) |
+| Sem boleto | Cód. Fornecedor, Fornecedor, NF, Valor | títulos sem boleto e contas de consumo, com total |
+
+Os cartões de resumo mostram a quantidade e o valor de cada aba e servem para trocar de aba. Cada status tem um nome e uma cor, definidos só em `STATUS_BOL` no `app.js` e usados pela tela, pelo Excel (fonte Arial, uma aba por aba da tela) e pela legenda da Ajuda: Com boleto (verde), Boleto agrupado (azul), Compõe o boleto (azul claro), Verificar (amarelo), Bloqueado (vermelho), Sem boleto e Conta de consumo (cinza).
+
+---
+
+## Testes
+
+Abra o **`testes.html`** no navegador: os testes rodam sozinhos e mostram **verde** (passou) ou **vermelho** (falhou), com um placar no topo. Usam **só dados fictícios** e as funções do próprio `app.js`, que é carregado em modo teste (`window.MODO_TESTE`: sem a tela, os elementos que faltam viram `<div>` soltos). Precisam de internet, como a página principal, por causa das bibliotecas.
+
+O que é testado:
+
+- código válido → linha digitável, banco, valor e vencimento certos, e a volta para o mesmo código;
+- um dígito trocado na linha → bloqueado;
+- código vindo como número (notação científica, ou célula numérica num Excel fictício) → bloqueado como ilegível;
+- 3 títulos que somam exatamente o valor de um boleto → 1 grupo com as 3 NFs;
+- só o valor igual (nome e NF diferentes) → não casa;
+- NF de 2 dígitos dentro do Nº Doc. → não conta como sinal de NF;
+- beneficiário que é um fundo de investimento, com valor e NF iguais → Verificação, "título cedido";
+- Excel gerado e lido de volta → linha digitável igual à da tela.
+
+As telas Santander, Itaú e Código de barras são conferidas à parte com os arquivos da pasta `EXEMPLOS/`, que têm dados reais e por isso ficam só no computador (ignorados pelo `.gitignore`).
+
+---
+
 ## Arquivos do projeto
 
-- `index.html`: estrutura da página (menu, as três conferências e a Ajuda).
+- `index.html`: estrutura da página (menu, as quatro conferências e a Ajuda).
 - `style.css`: aparência. Todas as cores, fontes e medidas ficam como variáveis no início do arquivo.
-- `app.js`: toda a lógica, em seções: navegação, funções compartilhadas e tabela de resultado, leitores por banco, Conferência de DDA (Santander), Conferência Itaú, Código de barras e ajuda dos cartões.
+- `app.js`: toda a lógica, em seções: navegação, funções compartilhadas e tabela de resultado, leitores por banco, Conferência de DDA (Santander), Conferência Itaú, Código de barras, ajuda dos cartões, **BOLETO** (validação da linha digitável e do código de barras) e Conferência de Boletos (leitura do relatório, checagens, pareamento, motivos de Verificação, tela e Excel).
+- `testes.html`: testes automáticos com dados fictícios (veja **Testes**).
 - `legado/`: versões antigas, mantidas só como referência (não são usadas pelo app).
 - `.gitignore`: impede o envio das pastas `EXEMPLOS/` e `backup/` e de qualquer `.xlsx`, `.xls` ou `.pdf` (arquivos com dados reais).
 
@@ -128,6 +245,10 @@ As bibliotecas e as fontes vêm da internet; sem conexão, a página abre mas n�
 
 - **Código de barras de 44 dígitos**: a leitura pelos últimos 10 dígitos está certa para a linha digitável (47 dígitos). No código de barras de 44 dígitos o valor fica no meio (do 10º ao 19º dígito); se o relatório do sistema trouxer esse formato, os títulos vão aparecer como divergentes.
 - **Caminhos de exportação**: os caminhos no internet banking e no sistema descritos na Ajuda foram deduzidos dos arquivos de exemplo e podem precisar de ajuste.
+- **Relatório "Duplicatas em Aberto Modelo A"**: a leitura do topo (empresa na A1, Data/Hora na linha 1 e "Período") é tolerante a formatos, mas foi testada só com planilhas fictícias. A tela sempre mostra o que leu, para conferir.
+- **DV geral do boleto**: quando o DV geral do código é 1, a regra do padrão bancário (0, 10 e 11 viram 1) deixa passar alguns erros de um dígito no código de barras de 44 dígitos. Na linha digitável, os DVs de campo pegam esses erros (os que sobram, no vencimento, vão para a Verificação). Por isso, confira sempre o beneficiário e o valor no banco.
+- **Nome do fornecedor**: fornecedor cujo nome só tem palavras ignoradas ou curtas não casa pelo nome (só por valor + NF, e aí vai para a Verificação).
+- **Copiar**: depende de o navegador liberar a área de transferência; se aparecer "Não copiou", abra a página por um endereço `http://localhost` ou use outro navegador.
 
 ## Privacidade
 

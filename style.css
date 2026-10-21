@@ -253,6 +253,57 @@ td.forn{min-width:200px}
 .diff{color:var(--so-banco-texto)}
 .vazio{padding:22px 14px;color:var(--texto-fraco);text-align:center}
 
+/* conferência de boletos: um nome e uma cor por status (as mesmas do Excel: STATUS_BOL no app.js) */
+:root{
+  --agrupado-fundo:#DCE8F7;  --agrupado-texto:#1F4E8C;   /* azul: boleto agrupado */
+  --compoe-fundo:#F1F6FC;                                /* azul claro: NF que compõe o boleto */
+}
+.st-ok     {--cor:var(--conferido-texto);  --cor-fundo:var(--conferido-fundo)}
+.st-grupo  {--cor:var(--agrupado-texto);   --cor-fundo:var(--agrupado-fundo)}
+.st-compoe {--cor:var(--agrupado-texto);   --cor-fundo:var(--compoe-fundo)}
+.st-verif  {--cor:var(--data-texto);       --cor-fundo:var(--data-fundo)}
+.st-bloq   {--cor:var(--so-banco-texto);   --cor-fundo:var(--so-banco-fundo)}
+.st-sem,
+.st-consumo{--cor:var(--so-sistema-texto); --cor-fundo:var(--so-sistema-fundo)}
+.resumo-abas{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.tabela-bol tbody tr td,
+.tabela-bol tbody tr:hover td{background:var(--cor-fundo)}
+.tabela-bol tbody tr.st-grupo td{font-weight:600;border-top:2px solid var(--agrupado-texto)}
+.tabela-bol tbody tr.st-compoe td{color:var(--texto-fraco)}
+.tabela-bol tbody tr.st-compoe td.forn{padding-left:30px}
+.tabela-bol tbody tr.st-bloq td:first-child{box-shadow:inset 3px 0 0 var(--so-banco-texto)}
+.tabela-bol .forn .status{display:table;margin-bottom:4px}
+.forn-nome{display:block}
+td.cod-bol{min-width:280px;max-width:360px;white-space:normal}
+.linha-dig{display:block;font-size:13px;word-break:break-word}
+td.verificar{min-width:260px;max-width:420px;font-size:13px;color:var(--cor)}
+.btn-copiar{margin-top:6px;padding:3px 12px;border-radius:999px;border:1px solid var(--borda-forte);background:var(--superficie);
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--texto);cursor:pointer}
+.btn-copiar:hover{border-color:var(--foco);color:var(--foco)}
+.btn-copiar:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.btn-copiar.copiado{border-color:var(--conferido-texto);color:var(--conferido-texto)}
+.btn-copiar.falhou{border-color:var(--so-banco-texto);color:var(--so-banco-texto)}
+
+/* conferência de boletos: checagens dos arquivos, no topo do resultado */
+.checagens{display:grid;gap:8px;margin-top:12px}
+.checagens:empty{display:none}
+.checagem{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:var(--raio);
+  border:1px solid var(--borda);background:var(--superficie);font-size:13px}
+.checagem-ico{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;
+  background:var(--cor-fundo);color:var(--cor)}
+.checagem-ok    {--cor:var(--conferido-texto); --cor-fundo:var(--conferido-fundo)}
+.checagem-aviso {--cor:var(--data-texto);      --cor-fundo:var(--data-fundo); border-color:var(--data-fundo)}
+.checagem-alerta{--cor:var(--so-banco-texto);  --cor-fundo:var(--so-banco-fundo);
+  background:var(--so-banco-fundo);border:2px solid var(--so-banco-texto);padding:16px 18px;font-size:14px}
+.checagem-alerta .checagem-titulo{font-size:17px;color:var(--so-banco-texto)}
+.checagem-alerta .checagem-ico{width:28px;height:28px;font-size:16px;background:var(--so-banco-texto);color:var(--superficie)}
+.checagem-titulo{font-weight:600}
+.checagem-texto{color:var(--texto-fraco)}
+.checagem-alerta .checagem-texto{color:var(--texto)}
+.checagem-lista{margin-top:4px}
+.checagem-lista summary{cursor:pointer;color:var(--foco)}
+.checagem-lista ul{margin:4px 0 0 18px;font-family:var(--fonte-numeros);font-size:12px}
+
 /* etiqueta de status: fundo claro e texto escuro da cor do grupo */
 .status{
   display:inline-block;padding:2px 10px;border-radius:999px;white-space:nowrap;
@@ -273,6 +324,7 @@ td .status + .status{margin-top:4px}
 .ajuda-bloco .grupos{list-style:none;padding-left:0}
 .ajuda-bloco .grupos .status{margin-right:8px}
 .ajuda-dica{color:var(--texto-fraco);font-style:italic}
+.ajuda-alerta{margin-top:10px;padding:10px 14px;border-radius:var(--raio);background:var(--data-fundo);color:var(--data-texto);border-left:4px solid var(--data-texto)}
 .tabela-status{margin-top:12px;border:1px solid var(--borda)}
 .tabela-status td:first-child,.tabela-status td:nth-child(2){white-space:nowrap}
 .tabela-status .bolinha{margin-right:8px}

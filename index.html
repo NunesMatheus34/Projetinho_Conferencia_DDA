@@ -34,6 +34,7 @@
   <symbol id="i-banco" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5M4.5 10v8M9 10v8M15 10v8M19.5 10v8M3 20.5h18"/></symbol>
   <symbol id="i-predio" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="1.5"/><path d="M9 7.5h1.5M13.5 7.5H15M9 11.5h1.5M13.5 11.5H15M9 15.5h1.5M13.5 15.5H15M10.5 20.5v-2.5h3v2.5"/></symbol>
   <symbol id="i-barras" viewBox="0 0 24 24"><path d="M4 5.5v13M7 5.5v13M10 5.5v13M13.5 5.5v13M16 5.5v13M20 5.5v13"/></symbol>
+  <symbol id="i-boleto" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><path d="M6.5 8.5h6M6.5 15.5v-3M8.5 15.5v-3M10.5 15.5v-3M13 15.5v-3M15 15.5v-3M17.5 15.5v-3M15 8.5h2.5"/></symbol>
   <symbol id="i-ajuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.8v.2"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></symbol>
   <symbol id="i-arquivo" viewBox="0 0 24 24"><path d="M14 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M12 17.5v-6M9.5 14 12 11.5l2.5 2.5"/></symbol>
@@ -53,6 +54,9 @@
   </a>
   <a href="#codigo-barras" class="menu-item" data-painel="codigo-barras" title="Código de barras">
     <svg class="ico menu-ico" aria-hidden="true"><use href="#i-barras"/></svg><span class="menu-txt">Código de barras</span>
+  </a>
+  <a href="#boletos" class="menu-item" data-painel="boletos" title="Conferência de Boletos">
+    <svg class="ico menu-ico" aria-hidden="true"><use href="#i-boleto"/></svg><span class="menu-txt">Conferência de Boletos</span>
   </a>
   <a href="#ajuda" class="menu-item menu-rodape" data-painel="ajuda" title="Ajuda">
     <svg class="ico menu-ico" aria-hidden="true"><use href="#i-ajuda"/></svg><span class="menu-txt">Ajuda</span>
@@ -363,7 +367,100 @@
   </section>
 
   <!-- =====================================================================
-       SEÇÃO 4 — AJUDA
+       SEÇÃO 4 — CONFERÊNCIA DE BOLETOS (DDA Itaú x Duplicatas em Aberto)
+       ===================================================================== -->
+  <section class="painel oculto" id="painel-boletos" aria-labelledby="titulo-bol">
+    <header class="tela-cabecalho">
+      <div>
+        <p class="sobretitulo">DDA Itaú x Duplicatas em aberto</p>
+        <h1 id="titulo-bol">Conferência de Boletos</h1>
+      </div>
+      <div class="tela-acoes">
+        <p class="tela-arquivos" id="bolArquivos">Nenhum arquivo enviado</p>
+        <button type="button" class="btn btn-baixar" data-baixar="bol" disabled>
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+      </div>
+    </header>
+
+    <div class="envio">
+      <label class="drop" id="bolDropBanco">
+        <input type="file" id="bolFileBanco" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">DDA do Itaú</span>
+        <span class="drop-dica">Excel "Consulta Boletos Recebidos". Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="bolTxtBanco">Nenhum arquivo escolhido</span>
+      </label>
+      <label class="drop" id="bolDropSis">
+        <input type="file" id="bolFileSis" accept=".xlsx,.xls">
+        <svg class="ico drop-ico" aria-hidden="true"><use href="#i-arquivo"/></svg>
+        <span class="drop-titulo">Duplicatas em aberto do sistema</span>
+        <span class="drop-dica">Excel "Duplicatas em Aberto Modelo A". Arraste o arquivo aqui ou clique para escolher.</span>
+        <span class="drop-arquivo" id="bolTxtSis">Nenhum arquivo escolhido</span>
+      </label>
+    </div>
+
+    <div class="acoes">
+      <button type="button" class="btn btn-conferir" id="bolBtnGo" disabled>Conferir</button>
+    </div>
+
+    <div class="erro-box" id="bolErro" role="alert"></div>
+
+    <div class="resultado" id="bolResultado">
+      <p class="info-consulta" id="bolInfo"></p>
+
+      <!-- checagens dos arquivos: mesma data, mesma empresa e período -->
+      <div class="checagens" id="bolChecagens"></div>
+
+      <!-- as 3 abas: os cartões mostram quantidade e valor; clicar troca a aba -->
+      <div class="resumo resumo-abas" id="bolResumo">
+        <div class="stat st-ok" data-aba="ok" data-ajuda="bolOk">
+          <button type="button" class="stat-filtro" aria-pressed="true">
+            <span class="stat-nome"><span class="bolinha"></span>Com boleto</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+        <div class="stat st-verif" data-aba="verif" data-ajuda="bolVerif">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Verificação</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+        <div class="stat st-sem" data-aba="sem" data-ajuda="bolSem">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>Sem boleto</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="tabela-caixa">
+        <div class="tabela-ferramentas">
+          <label class="busca">
+            <svg class="ico" aria-hidden="true"><use href="#i-busca"/></svg>
+            <input type="search" id="bolBusca" placeholder="Buscar fornecedor, NF, valor ou código" aria-label="Buscar fornecedor, NF, valor ou código">
+          </label>
+        </div>
+        <div class="tabela-rolagem">
+          <table class="tabela-bol">
+            <thead id="bolCabecalho"></thead>
+            <tbody id="bolCorpo"></tbody>
+            <tfoot id="bolRodape"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="acoes acoes-final">
+        <button type="button" class="btn btn-baixar" id="bolBtnXlsx">
+          <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar resultado (Excel)
+        </button>
+        <button type="button" class="btn btn-sec" id="bolBtnReset">Nova conferência</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SEÇÃO 5 — AJUDA
        ===================================================================== -->
   <section class="painel oculto" id="painel-ajuda" aria-labelledby="titulo-ajuda">
     <header class="tela-cabecalho">
@@ -475,6 +572,66 @@
           <li><span class="status g-valor">Divergência de valor</span> O valor do código de barras é diferente do saldo lançado. Veja se o lançamento está errado e corrija, ou peça o boleto certo ao fornecedor. A tabela começa pelas maiores diferenças.</li>
           <li><span class="status g-dup">Duplicado</span> O mesmo boleto foi lançado mais de uma vez (os títulos repetidos têm o mesmo número de grupo). Apague o lançamento repetido para não pagar duas vezes.</li>
         </ul>
+      </section>
+
+      <!-- ---------- Conferência de Boletos ---------- -->
+      <section class="ajuda-bloco">
+        <h2>Conferência de Boletos</h2>
+
+        <h3>Para que serve</h3>
+        <p>Acha, no DDA do Itaú, o boleto de cada título em aberto no sistema e entrega a <b>linha digitável pronta para copiar</b>, mas só depois de conferir se o código está íntegro: tamanho, dígitos verificadores, banco e valor. Também junta as notas pagas por um boleto só, avisa quando algo precisa ser conferido antes de pagar e nunca mexe no código que já está lançado no sistema.</p>
+
+        <h3>Arquivos que você precisa</h3>
+        <ul>
+          <li><b>DDA do Itaú, em Excel.</b> O mesmo arquivo da Conferência Itaú: <b>“Consulta Boletos Recebidos”</b>, salvo em Excel no internet banking.</li>
+          <li><b>Duplicatas em aberto do sistema, em Excel.</b> O relatório <b>“Duplicatas em Aberto Modelo A”</b>, com as colunas Vencto., Cliente, Duplicata, Prf, Código de barras e Saldo.</li>
+        </ul>
+        <p class="ajuda-alerta">Os dois arquivos têm que ser da <b>mesma empresa</b> e do <b>mesmo dia</b>. Relatório de uma empresa com o DDA de outra faz quase nada bater, e arquivos de dias diferentes deixam boletos e títulos de fora. A tela confere isso e avisa no topo.</p>
+
+        <h3>Passo a passo</h3>
+        <ol>
+          <li>No menu, clique em <b>Conferência de Boletos</b>.</li>
+          <li>Arraste o DDA do Itaú para a primeira caixa e o relatório “Duplicatas em Aberto Modelo A” para a segunda.</li>
+          <li>Clique em <b>Conferir</b>.</li>
+          <li>Leia os <b>avisos do topo</b> antes de tudo:
+            <ul>
+              <li><b>Mesma data:</b> a data da consulta do DDA e a do relatório têm que ser do mesmo dia.</li>
+              <li><b>Mesma empresa:</b> mostra o código da empresa do relatório e o nome e CNPJ do DDA. Se quase nada bater (menos de 10%), aparece um alerta vermelho: confira a empresa do relatório antes de seguir.</li>
+              <li><b>Período:</b> mostra o período do relatório e quantos boletos do DDA vencem fora dele. Se o período começa numa segunda-feira, os boletos de sábado e domingo anteriores entram também (são pagos na segunda), com a data original.</li>
+            </ul>
+          </li>
+          <li>Clique nos cartões <b>Com boleto</b>, <b>Verificação</b> e <b>Sem boleto</b> para trocar de aba. Cada cartão mostra a quantidade e o valor da aba. A busca procura fornecedor, NF, valor ou parte do código dentro da aba aberta.</li>
+          <li>Para pagar, clique em <b>Copiar</b> ao lado da linha digitável e cole no banco. Ao lado da linha aparecem o banco, o valor e o vencimento lidos do próprio código.</li>
+          <li>Se quiser, clique em <b>Baixar resultado (Excel)</b>: as mesmas 3 abas, com as mesmas colunas e cores. Antes de liberar o download, a página relê o Excel e confere cada linha digitável com a da tela; se alguma estiver diferente, o download é cancelado.</li>
+        </ol>
+
+        <h3>O que cada aba quer dizer</h3>
+        <ul>
+          <li><b>Com boleto:</b> títulos achados no DDA, um boleto para um título, sem nenhuma pendência e com o código conferido. Pode copiar a linha digitável e pagar.</li>
+          <li><b>Verificação:</b> tudo que precisa de atenção antes de pagar. Vem nesta ordem: primeiro os <b>boletos agrupados</b> (azul), depois os casos com algo a conferir (amarelo) e por último os <b>bloqueados</b> (vermelho). A coluna <b>“O que verificar”</b> diz o que fazer.</li>
+          <li><b>Sem boleto:</b> títulos do sistema que não têm boleto no DDA, e as contas de consumo (marcadas “Conta de consumo”).</li>
+        </ul>
+
+        <h3>Status e cores</h3>
+        <!-- preenchida pelo app.js (STATUS_BOL): mesmo nome e cor da tela e do Excel -->
+        <ul class="grupos" id="ajudaBolStatus"></ul>
+
+        <h3>O que fazer com cada caso da Verificação</h3>
+        <ul>
+          <li><b>“Boleto único: a soma das N NFs abaixo dá R$ X. Pagar uma vez só.”</b> Um boleto paga várias notas do mesmo fornecedor. Pague esse boleto <b>uma vez só</b>: as NFs logo abaixo (“compõe o boleto acima”) já estão nele.</li>
+          <li><b>“boleto agrupado ambíguo”</b> ou <b>“notas demais para conferir a soma”</b>: mais de uma combinação de notas dá o valor do boleto. Veja no boleto (ou com o fornecedor) quais notas ele paga. Nenhuma nota foi marcada como paga por ele.</li>
+          <li><b>“título cedido a factoring/fundo”</b>: o boleto está em nome de uma factoring, fundo, securitizadora ou cobradora. Confirme com o fornecedor que a cobrança foi mesmo passada para essa empresa antes de pagar.</li>
+          <li><b>“confirmar se é o mesmo fornecedor”</b>: o boleto está em nome de outra empresa. Confira o CNPJ e confirme com o fornecedor.</li>
+          <li><b>“Desconto/abatimento: pagar R$ X”</b>: o boleto tem um valor menor (desconto ou abatimento). Confira o valor e o prazo antes de pagar.</li>
+          <li><b>“Valor diferente: boleto R$ X x sistema R$ Y”</b>: NF e fornecedor batem, mas o valor não. Veja se o lançamento está errado ou peça o boleto certo.</li>
+          <li><b>“vencimento do código diferente do DDA (boleto prorrogado?)”</b>: o vencimento gravado no código não é o do DDA. Confirme a data com o fornecedor.</li>
+          <li><b>“possível pagamento em duplicidade”</b>: o mesmo fornecedor e o mesmo valor em NFs diferentes, ou a mesma linha digitável em mais de um lugar. Confirme que não são o mesmo boleto antes de pagar os dois.</li>
+          <li><b>“Boleto no DDA sem título no sistema”</b>: veja se falta lançar a nota. Se ninguém reconhecer o boleto, não pague.</li>
+          <li><b>“código digitado no sistema … é inválido / não está no DDA / ilegível; use o do DDA”</b>: o código lançado no sistema está errado. Corrija no sistema usando a linha digitável do DDA que aparece na mesma linha. A página <b>nunca</b> corrige o código do sistema sozinha.</li>
+          <li><b>Bloqueado</b> (vermelho): o código do DDA não passou na conferência (tamanho, dígitos verificadores, banco, valor, ou ficou ilegível no Excel). Não há linha digitável para copiar: peça o boleto certo ao fornecedor ou consulte o boleto direto no banco.</li>
+        </ul>
+
+        <p class="ajuda-alerta"><b>Na hora de pagar, confira no banco se o beneficiário e o valor batem com a planilha.</b></p>
       </section>
 
       <!-- ---------- Tabela de status ---------- -->

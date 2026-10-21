@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Testes da Conferência</title>
+
+<!-- As mesmas bibliotecas do index.html (mesma versão e mesmo hash de segurança) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+        integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"
+        integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<style>
+  :root{
+    --fundo:#F3F6F5; --superficie:#FFFFFF; --borda:#DDE5E2; --texto:#1B2A26; --texto-fraco:#5D6D68;
+    --ok-fundo:#E2F2E8; --ok-texto:#17653B; --falha-fundo:#FBE4E1; --falha-texto:#9A2A1C;
+    --fonte-texto:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --fonte-numeros:"IBM Plex Mono", ui-monospace, Consolas, "Courier New", monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--fonte-texto);font-size:15px;line-height:1.5;background:var(--fundo);color:var(--texto);padding:32px 16px}
+  main{max-width:960px;margin:0 auto}
+  h1{font-size:24px;font-weight:600}
+  .intro{margin-top:6px;color:var(--texto-fraco)}
+  .placar{margin-top:20px;padding:16px 20px;border-radius:10px;font-size:18px;font-weight:600;border:2px solid var(--borda);background:var(--superficie)}
+  .placar.ok{background:var(--ok-fundo);border-color:var(--ok-texto);color:var(--ok-texto)}
+  .placar.falha{background:var(--falha-fundo);border-color:var(--falha-texto);color:var(--falha-texto)}
+  ol{list-style:none;margin-top:16px;display:grid;gap:8px}
+  li{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:10px;background:var(--superficie);border:1px solid var(--borda)}
+  li.ok{border-left:6px solid var(--ok-texto)}
+  li.falha{border-left:6px solid var(--falha-texto);background:var(--falha-fundo)}
+  .marca{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff}
+  li.ok .marca{background:var(--ok-texto)}
+  li.falha .marca{background:var(--falha-texto)}
+  .nome{font-weight:600}
+  .detalhe{margin-top:2px;font-size:13px;color:var(--texto-fraco);font-family:var(--fonte-numeros);word-break:break-all}
+  li.falha .detalhe{color:var(--falha-texto)}
+  .rodape{margin-top:20px;font-size:13px;color:var(--texto-fraco)}
+</style>
+</head>
+
+<body>
+<main>
+  <h1>Testes da Conferência de Boletos</h1>
+  <p class="intro">Rodam sozinhos ao abrir esta página, só com dados <b>fictícios</b> (nenhum boleto ou fornecedor real). Usam as funções do próprio <code>app.js</code>. Verde = passou, vermelho = falhou.</p>
+  <p class="placar" id="placar" role="status">Rodando os testes…</p>
+  <ol id="lista"></ol>
+  <p class="rodape">As telas Santander, Itaú e Código de barras são conferidas com os arquivos reais da pasta EXEMPLOS, que ficam só no seu computador e não vão para o repositório. Por isso essa parte não roda aqui.</p>
+</main>
+
+<!-- carrega o app.js sem a tela: elementos que faltam viram <div> soltos (ver $ no app.js) -->
+<script>window.MODO_TESTE = true;</script>
+<script src="app.js"></script>
+
+<script>
+/* ===================================================================
+   TESTES — só dados fictícios
+   =================================================================== */
+const resultados = [];
+function confere(nome, passou, detalhe){ resultados.push({ nome, passou: !!passou, detalhe: detalhe || '' }); }
+async function teste(nome, fn){
+  try{ await fn(); }catch(err){ confere(nome, false, 'erro: ' + (err && err.message || err)); }
+}
+
+// boleto fictício com código válido (DV geral calculado pelo app.js)
+function codigoFicticio(banco, venc, valor, n){
+  const [d, m, a] = venc.split('/').map(Number);
+  const fator = 1000 + Math.round((Date.UTC(a, m - 1, d) - Date.UTC(2025, 1, 22)) / 86400000);
+  const livre = String(1000000000 + n).padStart(25, '0');
+  const sem = banco + '9' + String(fator).padStart(4, '0') + String(Math.round(valor * 100)).padStart(10, '0') + livre;
+  return sem.slice(0, 4) + dvMod11Geral(sem.slice(0, 4) + '0' + sem.slice(4)) + sem.slice(4);
+}
+// boleto e título no formato que o leitorItau e o leitorSistemaBoletos devolvem
+let nBoleto = 0, nTitulo = 0;
+function boletoFicticio({ beneficiario, doc, valor, venc = '20/11/2026', banco = '341', valorAPagar }){
+  const cod = codigoFicticio(banco, venc, valor, ++nBoleto);
+  return { venc, beneficiario, cnpj:'00.000.000/0001-00', doc, valor, valorAPagar: valorAPagar !== undefined ? valorAPagar : valor,
+           codigoBarras: cod, pagador:'EMPRESA FICTICIA LTDA', banco, comDesconto: valorAPagar !== undefined && valorAPagar !== valor,
+           codigoTexto: cod, codigoSuspeito:false, linhaExcel: 11 + nBoleto };
+}
+function tituloFicticio({ nome, doc, valor, fornecedor = '9001', venc = '20/11/2026' }){
+  return { venc, fornecedor, nome, doc, prf:'1', valor, codigoTexto:'', codigoSuspeito:false, temCodigo:false, linhaExcel: 5 + (++nTitulo) };
+}
+const grupoDe = (linhas, nome) => linhas.filter(l => ((l.titulo && l.titulo.nome) || (l.boleto && l.boleto.beneficiario)) === nome);
+
+async function rodaTestes(){
+  const ESP = { banco:'341', valor:1234.56, venc:'23/10/2026' };
+  const CB = '34191160800001234561234567890123456789012345';
+  const LINHA = '34191234546789012345767890123457116080000123456';
+
+  await teste('Código válido', () => {
+    const r = validaBoleto(CB, ESP);
+    const d = decodifica(CB);
+    confere('Código válido → linha digitável certa', r.ok && r.linha === LINHA, `linha ${r.linha}`);
+    confere('Código válido → banco 341, valor R$ 1.234,56, vencimento 23/10/2026',
+      d.banco === '341' && d.valor === 1234.56 && d.venc === '23/10/2026', `banco ${d.banco} · ${brl(d.valor)} · ${d.venc}`);
+    confere('Linha digitável → volta para o mesmo código de barras', linhaParaBarras(LINHA) === CB && validaBoleto(LINHA, ESP).cb === CB, linhaParaBarras(LINHA));
+  });
+
+  await teste('Um dígito trocado', () => {
+    const r = validaBoleto('34191234546789012345767891123457116080000123456', ESP);
+    confere('Um dígito trocado na linha → bloqueado, sem linha digitável', !r.ok && r.linha === '' && r.cb === '', r.motivo);
+  });
+
+  await teste('Código vindo como número', async () => {
+    const r = validaBoleto('3.4191160800001234e+43', ESP);
+    confere('Código "3.4191160800001234e+43" → bloqueado como "ilegível"', !r.ok && r.linha === '' && /ilegível/.test(r.motivo), r.motivo);
+    // o mesmo código gravado como NÚMERO num Excel fictício do DDA do Itaú
+    const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('DDA');
+    ws.addRow(['Data/Hora: 21/10/2026 às 09:00:00']);
+    ws.addRow(['Pagador/Agregado', 'Beneficiário', 'CPF/CNPJ', 'Venc.', 'Nº Doc.', 'Até Venc.', 'A Pagar', 'Tipo de Boleto', 'Banco', 'Observações', 'Código de barras']);
+    ws.addRow(['EMPRESA FICTICIA LTDA', 'FORNECEDOR FICTICIO', '00.000.000/0001-00', '23/10/2026', '123', 1234.56, 1234.56, 'Normal', '341', '', Number(CB)]);
+    ws.getCell('K3').numFmt = '0';
+    const arq = new File([await wb.xlsx.writeBuffer()], 'dda-ficticio.xlsx');
+    const leitura = await lerMatrizComTexto(arq);
+    const [b] = leitorItau(leitura.matriz, leitura);
+    const v = validaBoletoDda(b);
+    confere('Código gravado como número no Excel do DDA → bloqueado como "ilegível"', b.codigoSuspeito && !v.ok && v.linha === '' && /ilegível/.test(v.motivo), v.motivo);
+  });
+
+  await teste('Agrupado', () => {
+    const dda = [boletoFicticio({ beneficiario:'GRUPO FICTICIO ALFA', doc:'77', valor:600.60 })];
+    const tits = [100.10, 200.20, 300.30].map((v, i) => tituloFicticio({ nome:'GRUPO FICTICIO ALFA', doc:String(5101 + i), valor:v, fornecedor:'7001' }));
+    const linhas = conferirBoletos(dda, tits);
+    const grupo = linhas.filter(l => l.agrupado);
+    const abas = montaAbasBol(linhas);
+    const cab = abas.verif.find(r => r.status === 'grupo');
+    confere('3 títulos (R$ 100,10 + R$ 200,20 + R$ 300,30) e um boleto de R$ 600,60 → 1 grupo com as 3 NFs',
+      grupo.length === 3 && new Set(grupo.map(l => l.agrupado.idx)).size === 1 &&
+      grupo.map(l => l.titulo.doc).sort().join(',') === '5101,5102,5103' && cab && cab.nf === '3 NFs',
+      `${grupo.length} NFs no grupo (${grupo.map(l => l.titulo.doc).join(', ')}) · ${cab ? cab.verificar : 'sem linha do boleto'}`);
+  });
+
+  await teste('Só valor igual', () => {
+    const dda = [boletoFicticio({ beneficiario:'BETA PAPEIS LTDA', doc:'888', valor:450.00 })];
+    const tits = [tituloFicticio({ nome:'GAMA VIDROS LTDA', doc:'5201', valor:450.00 })];
+    const linhas = conferirBoletos(dda, tits);
+    const t = grupoDe(linhas, 'GAMA VIDROS LTDA')[0], b = grupoDe(linhas, 'BETA PAPEIS LTDA')[0];
+    confere('Só o valor igual (nome e NF diferentes) → NÃO casa', t && t.grupo === 'bolSem' && !t.boleto && b && b.grupo === 'bolDda',
+      `título: ${t && t.grupo} · boleto: ${b && b.grupo}`);
+  });
+
+  await teste('NF de 2 dígitos', () => {
+    const b = { ...boletoFicticio({ beneficiario:'DELTA FICTICIA ACOS', doc:'1046/A', valor:800.00 }), palavras: palavrasDoNome('DELTA FICTICIA ACOS') };
+    const t = { ...tituloFicticio({ nome:'DELTA FICTICIA ACOS', doc:'46', valor:790.00 }), palavras: palavrasDoNome('DELTA FICTICIA ACOS'), nf: nfSinal('46') };
+    const s = sinaisPar(t, b);
+    confere('NF "46" dentro do Nº Doc. "1046/A" → não conta como sinal de NF', nfSinal('46') === '' && !s.nf && s.n === 1,
+      `nfSinal("46") = "${nfSinal('46')}" · sinais: nome ${s.nome}, NF ${s.nf}, valor ${s.valor}`);
+    const linhas = conferirBoletos([boletoFicticio({ beneficiario:'DELTA FICTICIA ACOS', doc:'1046/A', valor:800.00 })],
+                                   [tituloFicticio({ nome:'DELTA FICTICIA ACOS', doc:'46', valor:790.00 })]);
+    const tl = linhas.find(l => l.titulo);
+    confere('… e por isso o par (só nome) não casa', tl && tl.grupo === 'bolSem', `título: ${tl && tl.grupo}`);
+  });
+
+  await teste('Título cedido', () => {
+    const dda = [boletoFicticio({ beneficiario:'XPTO FUNDO DE INVESTIMENTO', doc:'NF5301', valor:1500.00 })];
+    const tits = [tituloFicticio({ nome:'EPSILON FICTICIA TINTAS', doc:'5301', valor:1500.00 })];
+    const linhas = conferirBoletos(dda, tits);
+    const l = linhas.find(x => x.titulo);
+    const abas = montaAbasBol(linhas);
+    const r = abas.verif.find(x => x.fornecedor === 'EPSILON FICTICIA TINTAS');
+    confere('Beneficiário "XPTO FUNDO DE INVESTIMENTO" com valor e NF iguais → Verificação, "título cedido"',
+      l && l.grupo === 'bolVerif' && /título cedido/.test(l.motivo) && r && r.status === 'verif',
+      l ? `${l.grupo} · ${l.motivo}` : 'sem linha');
+  });
+
+  await teste('Excel confere com a tela', async () => {
+    const dda = [boletoFicticio({ beneficiario:'ZETA FICTICIA CABOS', doc:'99', valor:321.00 })];
+    const tits = [tituloFicticio({ nome:'ZETA FICTICIA CABOS', doc:'5401', valor:321.00 })];
+    const abas = montaAbasBol(conferirBoletos(dda, tits));
+    const buf = await planilhaBoletos(abas).xlsx.writeBuffer();
+    const erros = await confereExcelBoletos(buf, abas);
+    confere('Excel gerado e lido de volta → linha digitável igual à da tela', erros.length === 0 && abas.ok.length === 1, erros.join(' · ') || abas.ok[0].linha);
+  });
+
+  // placar
+  const lista = document.getElementById('lista');
+  lista.innerHTML = resultados.map(r =>
+    `<li class="${r.passou ? 'ok' : 'falha'}"><span class="marca" aria-hidden="true">${r.passou ? '✓' : '✗'}</span>` +
+    `<div><p class="nome">${escapa(r.nome)}</p>${r.detalhe ? `<p class="detalhe">${escapa(r.detalhe)}</p>` : ''}</div></li>`).join('');
+  const falhas = resultados.filter(r => !r.passou).length;
+  const placar = document.getElementById('placar');
+  placar.className = 'placar ' + (falhas ? 'falha' : 'ok');
+  placar.textContent = falhas ? `${falhas} de ${resultados.length} testes falharam` : `Todos os ${resultados.length} testes passaram`;
+  document.title = (falhas ? '✗ ' : '✓ ') + 'Testes da Conferência';
+  window.resultadoDosTestes = { total: resultados.length, falhas, resultados };
+}
+
+rodaTestes().catch(err => {
+  const placar = document.getElementById('placar');
+  placar.className = 'placar falha';
+  placar.textContent = 'Os testes não rodaram: ' + (err && err.message || err);
+  window.resultadoDosTestes = { total: 0, falhas: 1, erro: String(err) };
+});
+</script>
+</body>
+</html>
