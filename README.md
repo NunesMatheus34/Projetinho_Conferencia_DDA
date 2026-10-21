@@ -47,7 +47,7 @@ Você envia o DDA do banco e o relatório de títulos a pagar do sistema, e a p�
 | Arquivo | Como é lido |
 | --- | --- |
 | DDA do Santander | Excel do Pagador Eletrônico. Cabeçalho na linha 5; A = Vencimento, B = Beneficiário, C = Nosso Número, D = Pagador, E = Valor. |
-| DDA do Itaú | Excel "Consulta Boletos Recebidos". As primeiras linhas têm os dados da conta (inclusive "Data/Hora" da consulta, mostrada na tela). O cabeçalho é achado pelo conteúdo: a linha com "Beneficiário" e "Código de barras". Colunas: Pagador/Agregado, Beneficiário, CPF/CNPJ, Venc., Nº Doc., Até Venc., A Pagar, Tipo de Boleto, Banco, Observações, Código de barras. |
+| DDA do Itaú | Excel "Consulta Boletos Recebidos". As primeiras linhas têm os dados da conta (inclusive "Data/Hora" da consulta, mostrada na tela). O cabeçalho é achado pelo conteúdo: a linha com "Beneficiário" e "Código de barras". Colunas: Pagador/Agregado, Beneficiário, CPF/CNPJ, Venc., Nº Doc., Até Venc., A Pagar, Tipo de Boleto, Banco, Observações, Código de barras. O "Nº Doc." é guardado como texto (sem perder zeros à esquerda) e aparece na coluna própria "Nº Doc. (Itaú)" da tabela e do Excel. |
 | Títulos a pagar do sistema | Dados a partir da linha 7; C = Nome, D = Título (NF), P = Saldo. O título (NF) só aparece na tabela e entra na busca; não é usado na conferência. |
 
 O banco do arquivo é descoberto pelo **conteúdo**, não pelo nome. Se o DDA do Itaú for enviado na tela do Santander (ou o contrário), a página avisa e não confere.
@@ -56,7 +56,18 @@ O banco do arquivo é descoberto pelo **conteúdo**, não pelo nome. Se o DDA do
 
 - O valor comparado é o **"Até Venc."**. O **"A Pagar"** fica guardado à parte; quando os dois são diferentes, o boleto é marcado **com desconto**.
 - **Filtro por unidade**: quem tem "CAPINOPOLIS" no Pagador (com ou sem acento e espaços) é **Unidade Capinópolis**; o resto é **Matriz**. O relatório do sistema não é separado por unidade, então, ao filtrar uma unidade, os títulos da outra caem em "Só no sistema".
-- A tabela e o Excel trazem CNPJ, banco emissor (código, ex.: 237) e código de barras; o Excel traz também "A pagar", "Desconto" e "Unidade".
+- A tabela traz a coluna **Nº Doc. (Itaú)** (número do boleto no arquivo do Itaú; "—" em "Só no sistema"), CNPJ, banco emissor (código, ex.: 237) e código de barras. A coluna "NF / documento" mostra só a NF do sistema ("—" em "Só no banco").
+
+#### Colunas do Excel do Itaú
+
+| Aba | Colunas |
+| --- | --- |
+| Nome divergente | Vencimento, Nome no banco, Nome no sistema, CNPJ, Banco, Código de barras, Nº Doc. (Itaú), Para NF, Pedidos, Valor (até venc.), A pagar, Desconto, Unidade |
+| Datas divergentes | Nome/Beneficiário, Valor (até venc.), Data no DDA (boleto), Data no sistema (lançada), CNPJ, Banco, Código de barras, Nº Doc. (Itaú), A pagar, Desconto, Unidade |
+| So no banco / Conferidos | Vencimento, Nome/Beneficiário, CNPJ, Banco, Código de barras, Nº Doc. (Itaú), Para NF, Pedidos, Valor (até venc.), A pagar, Desconto, Unidade |
+| So no sistema | Vencimento, Nome/Beneficiário, Para NF, Pedidos, Valor (sem colunas do boleto) |
+
+"Nº Doc. (Itaú)" é gravado como texto (formato `@`), então números como `000040992001000` mantêm os zeros. "Para NF" e "Pedidos" vêm em branco para preencher.
 
 ### Como a conferência funciona
 

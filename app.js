@@ -584,11 +584,18 @@ function linhaDdaHtml(l, extras){
   const nome = escapa(b ? b.nome : s.nome);
   const nomeSistema = l.grupo==='nome' ? `<span class="sub">No sistema: ${escapa(s.nome)}</span>` : '';
 
-  // NF do sistema na frente; o número do boleto no banco embaixo
+  // Santander: NF do sistema na frente; o número do boleto no banco embaixo.
+  // Itaú: só a NF aqui; o Nº Doc. do boleto vai na coluna própria.
   const nf = s && s.doc ? s.doc : '';
   const docBanco = b && b.doc ? b.doc : '';
-  let doc = nf ? `<span class="mono">${escapa(nf)}</span>` : (docBanco ? `<span class="mono">${escapa(docBanco)}</span>` : '—');
-  if(nf && docBanco) doc += `<span class="sub mono">Banco: ${escapa(docBanco)}</span>`;
+  let doc;
+  if(extras){
+    doc = nf ? `<span class="mono">${escapa(nf)}</span>` : '—';
+  }else{
+    doc = nf ? `<span class="mono">${escapa(nf)}</span>` : (docBanco ? `<span class="mono">${escapa(docBanco)}</span>` : '—');
+    if(nf && docBanco) doc += `<span class="sub mono">Banco: ${escapa(docBanco)}</span>`;
+  }
+  const colunaDocItau = !extras ? '' : `<td class="mono">${docBanco ? escapa(docBanco) : '—'}</td>`;
 
   let valor = brl(l.valor);
   if(b && s){
@@ -604,7 +611,7 @@ function linhaDdaHtml(l, extras){
     `<td class="mono cod">${b && b.codigoBarras ? escapa(b.codigoBarras) : '—'}</td>`;
 
   return `<tr><td>${etiqueta(l.grupo)}</td><td class="mono">${venc}${vencSistema}</td>` +
-         `<td class="forn">${nome}${nomeSistema}</td><td>${doc}</td>${colunasExtras}` +
+         `<td class="forn">${nome}${nomeSistema}</td><td>${doc}</td>${colunaDocItau}${colunasExtras}` +
          `<td class="num mono">${valor}</td></tr>`;
 }
 
@@ -698,7 +705,10 @@ function montaAbaDda(wb, nomeAba, titulo, colunas, linhas){
     const r = ws.addRow(vals);
     r.eachCell({ includeEmpty:true }, c => { c.border = BORDA_FINA; });
     colunas.forEach((c, i) => {
-      if(c.fmt){ r.getCell(i+1).numFmt = c.fmt; r.getCell(i+1).alignment = { horizontal:'right' }; }
+      if(c.fmt){
+        r.getCell(i+1).numFmt = c.fmt;
+        if(c.fmt !== '@') r.getCell(i+1).alignment = { horizontal:'right' };
+      }
     });
   });
 
@@ -758,7 +768,7 @@ function unidadeDoPagador(p){
 let itauArqBanco = null, itauArqSis = null;
 let itauBanco = null, itauSistema = null, itauConsulta = '', itauUltimo = null;
 
-registraTela('itau', { colunas:8, linhaHtml: l => linhaDdaHtml(l, true), rodapeHtml: rodapeDda(8) });
+registraTela('itau', { colunas:9, linhaHtml: l => linhaDdaHtml(l, true), rodapeHtml: rodapeDda(9) });
 
 function itauCheca(){ $('itauBtnGo').disabled = !(itauArqBanco && itauArqSis); mostraArquivos('itau', [itauArqBanco, itauArqSis]); }
 ligaDrop('itauDropBanco','itauFileBanco','itauTxtBanco', f => { itauArqBanco = f; itauCheca(); });
@@ -823,6 +833,7 @@ const COLS_ITAU_MEIO = [
   { cab:'CNPJ',             w:20 },
   { cab:'Banco',            w:8 },
   { cab:'Código de barras', w:50 },
+  { cab:'Nº Doc. (Itaú)',   w:18, fmt:'@' },   // texto, para não perder zeros à esquerda
 ];
 const COLS_ITAU_FIM = [
   { cab:'A pagar',  w:16, fmt:FMT_REAL },
@@ -865,7 +876,7 @@ $('itauBtnXlsx').addEventListener('click', async () => {
 
   const wb = new ExcelJS.Workbook();
 
-  const meio = b => [ b.cnpj, b.banco, b.codigoBarras ];
+  const meio = b => [ b.cnpj, b.banco, b.codigoBarras, b.doc ? String(b.doc) : '' ];
   const fim  = b => [ b.valorAPagar, b.comDesconto ? 'com desconto' : '', NOMES_UNIDADE[unidadeDoPagador(b.pagador)] ];
   const linhaPadrao = (venc, nome, valor) => [ venc || '', nome || '', '', '', valor ];
 
