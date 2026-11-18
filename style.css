@@ -265,6 +265,12 @@ td.forn{min-width:200px}
 .st-bloq   {--cor:var(--so-banco-texto);   --cor-fundo:var(--so-banco-fundo)}
 .st-sem,
 .st-consumo{--cor:var(--so-sistema-texto); --cor-fundo:var(--so-sistema-fundo)}
+.st-codsis {--cor:var(--so-banco-texto);   --cor-fundo:var(--so-banco-fundo)}
+.st-folha  {--cor:var(--so-sistema-texto); --cor-fundo:#E3E7E6}
+.st-dda    {--cor:var(--nome-texto);       --cor-fundo:var(--nome-fundo)}
+.st-faixa,
+.st-subtotal{--cor:#0F4C47; --cor-fundo:#D5E3E1}
+.st-subtotal{--cor-fundo:#F4F6F5}
 .resumo-abas{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 .tabela-bol tbody tr td,
 .tabela-bol tbody tr:hover td{background:var(--cor-fundo)}
@@ -272,6 +278,9 @@ td.forn{min-width:200px}
 .tabela-bol tbody tr.st-compoe td{color:var(--texto-fraco)}
 .tabela-bol tbody tr.st-compoe td.forn{padding-left:30px}
 .tabela-bol tbody tr.st-bloq td:first-child{box-shadow:inset 3px 0 0 var(--so-banco-texto)}
+.tabela-bol tbody tr.st-codsis td:first-child{box-shadow:inset 3px 0 0 var(--so-banco-texto)}
+.tabela-bol tbody tr.st-faixa td{font-weight:600;color:var(--cor);border-top:2px solid var(--cor)}
+.tabela-bol tbody tr.st-subtotal td{font-weight:600;color:var(--cor)}
 .tabela-bol .forn .status{display:table;margin-bottom:4px}
 .forn-nome{display:block}
 td.cod-bol{min-width:280px;max-width:360px;white-space:normal}

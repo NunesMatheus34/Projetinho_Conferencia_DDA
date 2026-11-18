@@ -177,6 +177,128 @@ async function rodaTestes(){
     confere('Excel gerado e lido de volta → linha digitável igual à da tela', erros.length === 0 && abas.ok.length === 1, erros.join(' · ') || abas.ok[0].linha);
   });
 
+  await teste('NF no começo do Nº Doc.', () => {
+    confere('NF 13047 com Nº Doc. "013047-1" → conta como sinal de NF', nfNoDoc('13047', '013047-1'), 'começa com 13047');
+    confere('NF 13047 com Nº Doc. "1/13047" → NÃO conta (a NF tem que estar no começo)', !nfNoDoc('13047', '1/13047'), 'não começa com 13047');
+  });
+
+  await teste('Agrupado grande', () => {
+    // 25 títulos terminam em ,01 (centavos ≡ 1 mod 1000) e 15 terminam em ,00 de outra dezena
+    // (≡ 500 mod 1000): só a combinação das 25 dá a soma, então ela é única
+    const escolhidos = [], outros = [];
+    for(let i = 0; i < 25; i++) escolhidos.push(tituloFicticio({ nome:'POSTO FICTICIO OMEGA', doc:String(6001 + i), valor:(1000 * (5 + i) + 1) / 100, fornecedor:'7101' }));
+    for(let j = 0; j < 15; j++) outros.push(tituloFicticio({ nome:'POSTO FICTICIO OMEGA', doc:String(6101 + j), valor:(1000 * (7 + 2 * j) + 500) / 100, fornecedor:'7101' }));
+    const tits = [];
+    for(let k = 0; k < 40; k++) tits.push(k % 8 < 5 ? escolhidos.shift() || outros.shift() : outros.shift() || escolhidos.shift());
+    const alvo = tits.filter(t => Number(t.doc) < 6100).reduce((s, t) => s + Math.round(t.valor * 100), 0) / 100;
+    const linhas = conferirBoletos([boletoFicticio({ beneficiario:'POSTO FICTICIO OMEGA', doc:'FAT 900', valor:alvo })], tits);
+    const grupo = linhas.filter(l => l.agrupado);
+    const certos = grupo.every(l => Number(l.titulo.doc) < 6100);
+    confere('40 títulos e um boleto igual à soma de 25 deles → acha os 25', grupo.length === 25 && certos,
+      `${grupo.length} NFs no grupo · boleto ${brl(alvo)}`);
+  });
+
+  await teste('Boleto que não fecha', () => {
+    const tits = [5501, 5502, 5503].map(d => tituloFicticio({ nome:'CONQUISTA FICTICIA MOVEIS', doc:String(d), valor:300.00, fornecedor:'7201' }));
+    const linhas = conferirBoletos([boletoFicticio({ beneficiario:'CONQUISTA FICTICIA MOVEIS', doc:'FAT 12', valor:950.00 })], tits);
+    const b = linhas.find(l => l.naoFecha);
+    const sem = linhas.filter(l => l.grupo === 'bolSem');
+    confere('3 títulos somando R$ 900,00 e um boleto de R$ 950,00 → aviso com diferença de R$ 50,00, NFs continuam em "Sem boleto"',
+      b && b.grupo === 'bolVerif' && /não fecha com as 3 NFs/.test(b.motivo) && /diferença R\$\s?50,00/.test(b.motivo) && sem.length === 3,
+      b ? b.motivo : 'sem aviso');
+  });
+
+  await teste('NF com um dígito diferente', () => {
+    const linhas = conferirBoletos([boletoFicticio({ beneficiario:'RODOFRIO FICTICIA', doc:'246', valor:512.00 })],
+                                   [tituloFicticio({ nome:'RODOFRIO FICTICIA', doc:'256', valor:512.00 })]);
+    const l = linhas.find(x => x.titulo);
+    confere('NF 256 com Nº Doc. "246" (nome e valor iguais) → Verificação, "um dígito diferente"',
+      l && l.grupo === 'bolVerif' && /O boleto é da NF 246 e no sistema está NF 256/.test(l.motivo), l ? l.motivo : 'sem linha');
+  });
+
+  await teste('Cedido a instituição de pagamentos', () => {
+    const linhas = conferirBoletos([boletoFicticio({ beneficiario:'ACME PAGAMENTOS SA', doc:'5311', valor:610.00 })],
+                                   [tituloFicticio({ nome:'KAPPA FICTICIA BORRACHAS', doc:'5311', valor:610.00 })]);
+    const l = linhas.find(x => x.titulo);
+    confere('Beneficiário com PAGAMENTOS → "título cedido a factoring/fundo"', l && /título cedido/.test(l.motivo), l ? l.motivo : 'sem linha');
+  });
+
+  await teste('Código do sistema (etapa 4)', () => {
+    const comCodigo = (t, cod) => ({ ...t, codigoTexto: cod, temCodigo: true });
+    // a) DV inválido + boleto válido no DDA com mesmo valor e NF no Nº Doc.
+    const bA = boletoFicticio({ beneficiario:'MARRA FICTICIA FERRO', doc:'13047', valor:700.00 });
+    const valido = codigoFicticio('341', '20/11/2026', 700.00, 901);
+    const invalido = valido.slice(0, 30) + ((Number(valido[30]) + 1) % 10) + valido.slice(31);
+    const tA = comCodigo(tituloFicticio({ nome:'MARRA FICTICIA FERRO', doc:'13047', valor:700.00 }), invalido);
+    const linhasA = conferirBoletos([bA], [tA]);
+    const lA = linhasA.find(l => l.titulo);
+    const abasA = montaAbasBol(linhasA);
+    const rA = abasA.verif[abasA.verif.length - 1];
+    confere('Código do sistema com DV inválido e boleto válido no DDA → bloco vermelho, sugerindo o código do DDA',
+      lA && lA.grupo === 'bolCodSis' && lA.motivo.startsWith(MSG_COD_SIS.invalidoComDda) && lA.linha === barrasParaLinha(bA.codigoTexto) &&
+      rA && rA.status === 'codsis', lA ? lA.motivo : 'sem linha');
+    confere('… e o código do sistema não é corrigido', tA.codigoTexto === invalido && lA.titulo.codigoTexto === invalido, lA.titulo.codigoTexto);
+    // b) código válido de outro banco
+    const bB = boletoFicticio({ beneficiario:'TUBO FICTICIO ACOS', doc:'7001', valor:820.00, banco:'001' });
+    const tB = comCodigo(tituloFicticio({ nome:'TUBO FICTICIO ACOS', doc:'7001', valor:820.00 }), codigoFicticio('033', '20/11/2026', 820.00, 902));
+    const lB = conferirBoletos([bB], [tB]).find(l => l.titulo);
+    confere('Código válido de outro banco → "Boleto trocado"', lB && lB.motivo.startsWith(MSG_COD_SIS.trocado), lB ? lB.motivo : 'sem linha');
+    // c) mesmo banco, outro número
+    const bC = boletoFicticio({ beneficiario:'SIGMA FICTICIA LONAS', doc:'7101', valor:330.00 });
+    const tC = comCodigo(tituloFicticio({ nome:'SIGMA FICTICIA LONAS', doc:'7101', valor:330.00 }), codigoFicticio('341', '20/11/2026', 330.00, 903));
+    const lC = conferirBoletos([bC], [tC]).find(l => l.titulo);
+    confere('Código válido do mesmo banco, outro número → "Código do sistema diferente do boleto do DDA"', lC && lC.motivo.startsWith(MSG_COD_SIS.diferente), lC ? lC.motivo : 'sem linha');
+    // d) nenhum boleto no DDA
+    const tD = comCodigo(tituloFicticio({ nome:'TAU FICTICIA MOLAS', doc:'7201', valor:90.00 }), codigoFicticio('341', '20/11/2026', 90.00, 904));
+    const lD = conferirBoletos([boletoFicticio({ beneficiario:'OUTRO FICTICIO', doc:'1', valor:12.34 })], [tD]).find(l => l.titulo);
+    confere('Código válido sem boleto no DDA → "Código válido, mas não aparece no DDA"', lD && lD.motivo.startsWith(MSG_COD_SIS.foraDoDda) && !lD.boleto, lD ? lD.motivo : 'sem linha');
+    // e) código igual ao do DDA → fora da conferência, boleto usado
+    const bE = boletoFicticio({ beneficiario:'FI FICTICIA PNEUS', doc:'7301', valor:150.00 });
+    const linhasE = conferirBoletos([bE], [comCodigo(tituloFicticio({ nome:'FI FICTICIA PNEUS', doc:'7301', valor:150.00 }), bE.codigoTexto)]);
+    const abasE = montaAbasBol(linhasE);
+    confere('Código do sistema igual ao do DDA → OK, fora das abas e o boleto não sobra no DDA',
+      linhasE.length === 1 && linhasE[0].grupo === 'bolJa' && abasE.dda.length === 0 && abasE.ok.length === 0 && abasE.jaConferidos === 1,
+      `${linhasE.map(l => l.grupo).join(', ')} · já conferidos: ${abasE.jaConferidos}`);
+  });
+
+  await teste('Folha e impostos', () => {
+    const tits = [1, 2, 3].map(i => tituloFicticio({ nome:'EMPRESTIMO CONSIGNADO FOLHA', doc:String(8000 + i), valor:100.00 * i, fornecedor:'9901' }));
+    tits.push(tituloFicticio({ nome:'OMICRON FICTICIA CAIXAS', doc:'8101', valor:55.00 }));
+    const linhas = conferirBoletos([boletoFicticio({ beneficiario:'OUTRO FICTICIO', doc:'1', valor:12.34 })], tits);
+    const abas = montaAbasBol(linhas);
+    const folha = abas.sem.filter(r => r.status === 'folha');
+    const umPorUm = abas.sem.filter(r => r.status === 'sem' && /CONSIGNADO/.test(r.fornecedor));
+    confere('"EMPRESTIMO CONSIGNADO FOLHA" → bloco "Folha e impostos", uma linha por tipo, não aparece um por um',
+      folha.length === 1 && folha[0].qtd === 3 && folha[0].valor === 600 && umPorUm.length === 0 &&
+      abas.sem.some(r => r.status === 'faixa' && /Folha e impostos/.test(r.fornecedor)),
+      folha.length ? `${folha[0].fornecedor} · ${folha[0].nf} · ${brl(folha[0].valor)}` : 'sem bloco');
+    confere('… e o total da aba conta os 4 títulos', resumoAba(abas.sem).qtd === 4 && resumoAba(abas.sem).total === 655, `${resumoAba(abas.sem).qtd} itens · ${brl(resumoAba(abas.sem).total)}`);
+  });
+
+  await teste('Período com 2 vencimentos', async () => {
+    const dda = [boletoFicticio({ beneficiario:'PI FICTICIA VIDROS', doc:'9101', valor:100.00, venc:'14/11/2026' }),
+                 boletoFicticio({ beneficiario:'RHO FICTICIA TELAS', doc:'9102', valor:200.00, venc:'16/11/2026' }),
+                 boletoFicticio({ beneficiario:'CHI FICTICIA ROLOS', doc:'9103', valor:250.00, venc:'16/11/2026' })];
+    const tits = [tituloFicticio({ nome:'PI FICTICIA VIDROS', doc:'9101', valor:100.00, venc:'14/11/2026' }),
+                  tituloFicticio({ nome:'RHO FICTICIA TELAS', doc:'9102', valor:200.00, venc:'16/11/2026' }),
+                  tituloFicticio({ nome:'CHI FICTICIA ROLOS', doc:'9103', valor:250.00, venc:'16/11/2026' })];
+    const abas = montaAbasBol(conferirBoletos(dda, tits), { porData:true });
+    const faixas = abas.ok.filter(r => r.status === 'faixa').map(r => r.fornecedor);
+    const subt = abas.ok.filter(r => r.status === 'subtotal').map(r => r.valor);
+    confere('2 vencimentos → uma faixa por data, com subtotal de cada data e total geral',
+      faixas.length === 2 && /14\/11\/2026 \(sábado\)/.test(faixas[0]) && /16\/11\/2026 \(segunda\)/.test(faixas[1]) &&
+      subt.join('|') === '100|450' && resumoAba(abas.ok).total === 550, `${faixas.join(' · ')} · subtotais ${subt.map(brl).join(', ')}`);
+    const buf = await planilhaBoletos(abas).xlsx.writeBuffer();
+    const erros = await confereExcelBoletos(buf, abas);
+    confere('… e o Excel com as faixas confere com a tela', erros.length === 0, erros.join(' · ') || 'ok');
+  });
+
+  await teste('Dados do arquivo como texto', () => {
+    const r = linhaAbaBol('ok', { t: tituloFicticio({ nome:'<img src=x onerror=alert(1)>', doc:'1', valor:1 }), valor:1, bloco:1 });
+    const tr = linhaAbaTr(r, 'ok', colunasAbaBol('ok'));
+    confere('Nome com HTML aparece como texto (textContent), sem criar elemento', !tr.querySelector('img') && tr.textContent.includes('<img'), tr.textContent.slice(0, 60));
+  });
+
   // placar
   const lista = document.getElementById('lista');
   lista.innerHTML = resultados.map(r =>

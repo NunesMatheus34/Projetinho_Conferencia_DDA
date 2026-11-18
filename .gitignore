@@ -6,3 +6,5 @@ backup/
 *.xlsx
 *.xls
 *.pdf
+*.RET
+*.ret

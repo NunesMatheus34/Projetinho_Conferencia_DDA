@@ -1227,8 +1227,9 @@ const AJUDA_RESUMO = {
   cbDup:      'O mesmo código de barras foi lançado em mais de um título. Risco de pagar duas vezes: apague o lançamento repetido.',
   cbOk:       'Títulos em que o valor do código de barras bate com o saldo lançado.',
   bolOk:      'Títulos achados no DDA um para um, sem nenhuma pendência, com o código conferido (tamanho, dígitos, banco e valor). Pode copiar a linha digitável e pagar.',
-  bolVerif:   'Precisa de atenção antes de pagar: boletos agrupados (azul), casos com algo a conferir (amarelo) e códigos bloqueados (vermelho). A coluna "O que verificar" diz o quê.',
-  bolSem:     'Títulos do sistema sem boleto no DDA (pode ser Pix, transferência ou boleto ainda não emitido) e contas de consumo, marcadas como "conta de consumo".',
+  bolVerif:   'Precisa de atenção antes de pagar: boletos agrupados (azul), casos com algo a conferir (amarelo), códigos bloqueados (vermelho) e, no fim, os códigos do sistema errados. A coluna "O que verificar" diz o quê.',
+  bolSem:     'Títulos do sistema sem boleto no DDA (pode ser Pix, transferência ou boleto ainda não emitido), contas de consumo e, no fim, folha e impostos somados por tipo.',
+  bolDda:     'Boletos do DDA que não casaram com nenhum título do sistema, do maior valor para o menor. Veja se falta lançar a nota. Se ninguém reconhecer o boleto, não pague.',
 };
 
 function fechaDicas(exceto){
@@ -1409,13 +1410,17 @@ function formataLinha(l47){
    PAREAMENTO, abaixo: nome, NF e valor) e entrega a linha digitável,
    mas só se o código do DDA passar no validaBoleto (seção 7).
    Títulos que JÁ têm código no sistema ficam fora da conferência; o código
-   deles só é conferido. Nada aqui corrige o código do sistema.
+   deles só é conferido (e, se estiver errado, o site aponta o boleto certo do
+   DDA). Nada aqui corrige o código do sistema.
    Grupos:
-     bolOk    Com boleto     título achado no DDA (nome + valor, ou boleto agrupado), código válido
-     bolVerif Verificação    código bloqueado, nome ou valor diferente, ou código do sistema errado
-     bolJa    Já tem código  código no sistema válido e igual ao do DDA (ou conta de consumo)
-     bolSem   Sem boleto     título sem código que não está no DDA
-     bolDda   Só no DDA      boleto do DDA sem título no sistema
+     bolOk     Com boleto     título achado no DDA (2 sinais entre nome, NF e valor), sem pendência
+     bolVerif  Verificação    agrupado, código do DDA bloqueado, outra empresa, NF com 1 dígito
+                              diferente, desconto, valor diferente, boleto que não fecha, duplicidade
+     bolCodSis Verificação    (bloco vermelho no fim) código do sistema inválido, trocado ou fora do DDA
+     bolJa     (fora)         código no sistema válido e igual ao do DDA (ou conta de consumo)
+     bolSem    Sem boleto     título sem código que não está no DDA
+     bolFolha  Sem boleto     folha e impostos (bloco no fim, somado por tipo)
+     bolDda    DDA sem título boleto do DDA sem título no sistema
    =================================================================== */
 
 // SISTEMA ("Duplicatas em Aberto Modelo A"): o cabeçalho é a linha com
@@ -1535,6 +1540,9 @@ function contaDoDdaItau(m){
   };
 }
 
+// código da empresa no sistema (célula A1 do relatório) -> nome, só para mostrar
+const EMPRESAS_SISTEMA = { '5':'CRV Minas, filial 0004-35' };
+
 // período efetivo: se começa numa segunda-feira, inclui o sábado e o domingo
 // anteriores (boleto que vence no fim de semana é pago na segunda)
 function periodoEfetivo(periodo){
@@ -1588,7 +1596,7 @@ function checagensBoletos({ topo, consultaDda, conta, dda, linhas }){
       fora.forEach(b => itens.push(`${dataBR(b.venc) || 'sem vencimento'} · ${b.beneficiario} · ${brl(b.valor)}`));
     }
     out.push({ tipo: fora.length ? 'aviso' : 'ok', titulo:`Período do relatório: ${txtPer}`,
-      texto: fora.length ? `${fora.length} de ${dda.length} boletos do DDA vencem fora do período do relatório; eles aparecem na Verificação como "boleto no DDA sem título no sistema".`
+      texto: fora.length ? `${fora.length} de ${dda.length} boletos do DDA vencem fora do período do relatório; eles aparecem na aba "DDA sem título no sistema".`
                          : `Todos os ${dda.length} boletos do DDA vencem dentro do período${per.segunda ? ' (contando o fim de semana anterior)' : ''}.`,
       itens });
     // aviso na própria linha do boleto de fim de semana, com a data original
@@ -1603,7 +1611,8 @@ function checagensBoletos({ topo, consultaDda, conta, dda, linhas }){
   const base = dentro.length ? dentro : dda;
   const nCasados = base.filter(b => casados.has(dda.indexOf(b))).length;
   const pct = base.length ? nCasados / base.length : 0;
-  const quem = `Relatório do sistema: empresa ${topo.empresa || '(não achei o código na célula A1)'} · ` +
+  const nomeEmp = EMPRESAS_SISTEMA[topo.empresa];
+  const quem = `Relatório do sistema: empresa ${topo.empresa ? topo.empresa + (nomeEmp ? ' = ' + nomeEmp : '') : '(não achei o código na célula A1)'} · ` +
                `DDA: ${conta.nome || 'nome não encontrado'}${conta.cnpj ? ' · CNPJ ' + conta.cnpj : ''}`;
   const conta_ = `${nCasados} de ${base.length} boletos do DDA${dentro.length && per ? ' (dentro do período)' : ''} casaram com títulos do sistema (${Math.round(pct*100)}%, contando os códigos já lançados).`;
   if(pct < 0.10){
@@ -1615,14 +1624,22 @@ function checagensBoletos({ topo, consultaDda, conta, dda, linhas }){
   return out;
 }
 
-function checagensHtml(lista){
+// as checagens como elementos (textContent: os textos trazem nomes vindos dos arquivos)
+function checagensDom(lista){
   const icone = { ok:'✓', aviso:'!', alerta:'!' };
-  return lista.map(c =>
-    `<div class="checagem checagem-${c.tipo}"${c.tipo==='alerta' ? ' role="alert"' : ''}>` +
-      `<span class="checagem-ico" aria-hidden="true">${icone[c.tipo]}</span>` +
-      `<div><p class="checagem-titulo">${escapa(c.titulo)}</p><p class="checagem-texto">${escapa(c.texto)}</p>` +
-      (c.itens && c.itens.length ? `<details class="checagem-lista"><summary>Ver a lista</summary><ul>${c.itens.map(i => `<li>${escapa(i)}</li>`).join('')}</ul></details>` : '') +
-    `</div></div>`).join('');
+  return lista.map(c => {
+    const caixa = cria('div', `checagem checagem-${c.tipo}`);
+    if(c.tipo === 'alerta') caixa.setAttribute('role', 'alert');
+    const ico = cria('span', 'checagem-ico', icone[c.tipo]);
+    ico.setAttribute('aria-hidden', 'true');
+    const corpo = criaCom('div', '', [cria('p', 'checagem-titulo', c.titulo), cria('p', 'checagem-texto', c.texto)]);
+    if(c.itens && c.itens.length){
+      corpo.appendChild(criaCom('details', 'checagem-lista', [cria('summary', '', 'Ver a lista'),
+        criaCom('ul', '', c.itens.map(i => cria('li', '', i)))]));
+    }
+    caixa.appendChild(ico); caixa.appendChild(corpo);
+    return caixa;
+  });
 }
 
 // código de um boleto do DDA: bloqueia se a célula não era texto (pode ter perdido dígitos)
@@ -1639,7 +1656,9 @@ function validaBoletoDda(b){
       nome, NF e valor. Só o valor nunca casa.
    2) Boleto agrupado: um boleto que paga 2 ou mais títulos do mesmo
       fornecedor, com soma exata ao centavo (subset-sum em centavos).
-   3) O resto fica sem boleto.
+   3) Boleto que não fecha: boleto livre de um fornecedor com títulos sem
+      boleto cuja soma é diferente (vai para a Verificação).
+   4) O resto fica sem boleto / DDA sem título no sistema.
    ------------------------------------------------------------------- */
 
 // palavras que não ajudam a dizer quem é o fornecedor. Comparadas pelas 5 primeiras
@@ -1693,13 +1712,16 @@ function nfSinal(doc){
   const d = apenasDigitos(doc).replace(/^0+/, '');
   return d.length >= 3 ? d : '';
 }
+// sinal de NF: a NF aparece no COMEÇO dos dígitos do Nº Doc. (sem zeros à esquerda).
+// Ex.: NF 13047 casa com Nº Doc. "013047-1", mas não com "1/13047".
+const nfNoDoc = (nf, doc) => !!nf && apenasDigitos(doc).replace(/^0+/, '').startsWith(nf);
 
 const emCentavos = v => (v===null || v===undefined || isNaN(v)) ? null : Math.round(v * 100);
 
 // sinais entre um título do sistema e um boleto do DDA
 function sinaisPar(t, b){
   const nome = [...t.palavras].some(p => b.palavras.has(p));
-  const nf = !!t.nf && apenasDigitos(b.doc).includes(t.nf);
+  const nf = nfNoDoc(t.nf, b.doc);
   const c = emCentavos(t.valor);
   const valorAteVenc = c === emCentavos(b.valor);
   const valorAPagar = !valorAteVenc && b.valorAPagar!==null && c === emCentavos(b.valorAPagar);
@@ -1827,13 +1849,15 @@ function agruparBoletos(boletosLivres, titulosCandidatos){
    - o boleto está em nome de outra empresa (3 primeiras letras do primeiro
      nome diferentes, ou o nome não bateu no pareamento): "título cedido a
      factoring/fundo" se o beneficiário for FOMENTO, FIDC, FUNDO, FACTORING,
-     CRED..., COBRAN... ou SECURITIZ...; senão "confirmar se é o mesmo fornecedor";
+     SECURITIZ..., CRED..., COBRAN... ou PAGAMENTOS; senão "confirmar se é o
+     mesmo fornecedor";
+   - casou por nome e valor, mas o Nº Doc. traz a NF com 1 dígito diferente
+     (ver umDigitoDiferente);
    - "A Pagar" diferente de "Até Venc.": "Desconto/abatimento: pagar R$ X";
    - bateram NF e nome mas não o valor: "Valor diferente: boleto R$ X x sistema R$ Y";
-   - código do DDA inválido, código do sistema errado/fora do DDA, ou o aviso de
-     vencimento do validaBoleto (boleto prorrogado?);
+   - código do DDA inválido ou o aviso de vencimento do validaBoleto (boleto prorrogado?);
    - possível pagamento em duplicidade (ver marcaDuplicidade).
-   "Já tem código" nunca muda de grupo (fica fora da conferência): só ganha o aviso.
+   Títulos com código no sistema ficam fora da conferência (ver conferirBoletos, passo 1).
    ------------------------------------------------------------------- */
 
 // primeiro nome (primeira palavra só de letras), para comparar as 3 primeiras letras
@@ -1842,22 +1866,68 @@ function outraEmpresa(nomeSistema, beneficiario){
   const a = primeiroNome(nomeSistema).slice(0, 3), b = primeiroNome(beneficiario).slice(0, 3);
   return !!a && !!b && a !== b;
 }
-const PALAVRAS_FACTORING = ['FOMENTO', 'FIDC', 'FUNDO', 'FACTORING', 'CRED', 'COBRAN', 'SECURITIZ'];
+// comparadas pelo começo da palavra (CRED pega CREDITO, PAGAMENTO pega PAGAMENTOS)
+const PALAVRAS_FACTORING = ['FOMENTO', 'FIDC', 'FUNDO', 'FACTORING', 'CRED', 'COBRAN', 'SECURITIZ', 'PAGAMENTO'];
 function cedidoAFactoring(beneficiario){
   const palavras = normaliza(beneficiario).match(/[A-Z]+/g) || [];
   return palavras.some(p => PALAVRAS_FACTORING.some(f => p.startsWith(f)));
 }
+const motivoOutraEmpresa = beneficiario =>
+  cedidoAFactoring(beneficiario) ? 'título cedido a factoring/fundo' : 'confirmar se é o mesmo fornecedor';
+
+// NF com um dígito diferente: algum número do Nº Doc. (sem zeros à esquerda), ou o
+// começo dos dígitos dele, tem o mesmo tamanho da NF e só 1 dígito diferente.
+// Devolve esse número ('' se não houver). Ex.: NF 256 x Nº Doc. 246.
+function umDigitoDiferente(nf, doc){
+  if(!nf) return '';
+  const tiraZeros = s => s.replace(/^0+/, '');
+  const cands = (String(doc || '').match(/\d+/g) || []).map(tiraZeros);
+  cands.push(tiraZeros(apenasDigitos(doc)).slice(0, nf.length));
+  for(const c of cands){
+    if(c.length !== nf.length || c === nf) continue;
+    let dif = 0;
+    for(let i = 0; i < c.length; i++) if(c[i] !== nf[i]) dif++;
+    if(dif === 1) return c;
+  }
+  return '';
+}
+
+// FOLHA E IMPOSTOS: nunca vêm no DDA. Ficam fora do pareamento e aparecem num
+// bloco no fim da aba "Sem boleto", uma linha por tipo. A ordem importa: o
+// primeiro tipo que aparecer no nome é o que vale.
+const TIPOS_FOLHA = [
+  ['13º salário',           /\b13\S*\s*SALARIO/],
+  ['Consignado',            /CONSIGNADO/],
+  ['INSS',                  /\bINSS\b/],
+  ['FGTS',                  /\bFGTS\b/],
+  ['IRRF',                  /\bIRRF\b/],
+  ['DARF',                  /\bDARF\b/],
+  ['Pensão alimentícia',    /PENSAO ALIMENT/],
+  ['Contribuição sindical', /CONTRIBUICAO SINDICAL/],
+  ['Rescisão',              /RESCIS/],
+  ['Férias',                /FERIAS/],
+  ['Folha',                 /\bFOLHA\b/],
+  ['Salário',               /SALARIO/],
+];
+function tipoFolha(nome){
+  const n = normaliza(nome);
+  const achou = TIPOS_FOLHA.find(([, re]) => re.test(n));
+  return achou ? achou[0] : '';
+}
+
+// banco de um boleto do DDA: pelo código (se válido) ou pela coluna Banco
+const bancoDoBoleto = b => b.val && b.val.ok ? b.val.cb.slice(0, 3) : apenasDigitos(b.banco).padStart(3, '0');
 
 // possível pagamento em duplicidade, entre as linhas que têm título e boleto, e os
 // boletos do DDA sem título:
 //  a) mesmo fornecedor (código do sistema) e mesmo valor em NFs diferentes;
 //  b) a mesma linha digitável em mais de uma linha (as notas de um mesmo boleto
 //     agrupado contam como uma só).
-// Quem estava em "Com boleto" ou "Só no DDA" vai para a Verificação; "Já tem código"
-// só ganha o aviso.
+// Quem estava em "Com boleto" ou "DDA sem título" vai para a Verificação; os títulos
+// com código no sistema (fora da conferência) só ganham o aviso.
 function marcaDuplicidade(linhas){
   const marca = (l, texto) => {
-    if(l.grupo === 'bolJa'){ l.avisos.push(texto); return; }
+    if(l.grupo === 'bolJa' || l.grupo === 'bolCodSis'){ l.avisos.push(texto); return; }
     l.motivo = l.motivo ? `${l.motivo} · ${texto}` : texto;
     l.grupo = 'bolVerif';
   };
@@ -1886,8 +1956,42 @@ function marcaDuplicidade(linhas){
   });
 }
 
+// ETAPA 4: título com código no sistema que não é o de um boleto do DDA.
+// Procura um boleto LIVRE com o mesmo valor e com a NF no Nº Doc. ou nome parecido
+// (preferência: 1º Nº Doc. com a NF, 2º vencimento do código igual ao do boleto) e
+// devolve a frase do que fazer. NUNCA corrige o código do sistema.
+const MSG_COD_SIS = {
+  invalidoComDda: 'Código digitado no sistema é INVÁLIDO. Use o código do DDA ao lado',
+  invalidoSemDda: 'Código digitado no sistema é INVÁLIDO. Peça o boleto ao fornecedor',
+  trocado:        'Boleto trocado: confirme com o fornecedor qual é o válido. Não pague os dois.',
+  diferente:      'Código do sistema diferente do boleto do DDA. Use o do DDA e corrija o lançamento',
+  foraDoDda:      'Código válido, mas não aparece no DDA. Confirme se o boleto ainda está em aberto.',
+  repetido:       'O mesmo código já está lançado em outro título do sistema. Confira qual NF ele paga; não pague duas vezes.',
+};
+function procuraBoletoDoCodigo(p, livres, genericas){
+  const t = p.t, c = emCentavos(t.valor), nf = nfSinal(t.doc);
+  const palavras = palavrasDoNome(t.nome, genericas);
+  const vencCodigo = p.cb ? decodifica(p.cb).venc : '';
+  const cand = livres
+    .filter(b => emCentavos(b.valor) === c || (b.valorAPagar !== null && b.valorAPagar !== undefined && emCentavos(b.valorAPagar) === c))
+    .map(b => ({ b,
+      nfDoc: !!nf && apenasDigitos(b.doc).includes(nf),
+      nome: [...palavras].some(x => palavrasDoNome(b.beneficiario, genericas).has(x)),
+      mesmoVenc: !!vencCodigo && formatData(b.venc) === vencCodigo }))
+    .filter(x => x.nfDoc || x.nome)
+    .sort((x, y) => (y.nfDoc - x.nfDoc) || (y.mesmoVenc - x.mesmoVenc) || (y.nome - x.nome) || x.b.idx - y.b.idx);
+  return cand.length ? cand[0].b : null;
+}
+function fraseCodSis(p, achado){
+  if(p.invalido) return achado && achado.val.ok ? MSG_COD_SIS.invalidoComDda : MSG_COD_SIS.invalidoSemDda;
+  if(!achado) return p.repetido ? MSG_COD_SIS.repetido : MSG_COD_SIS.foraDoDda;
+  if(bancoDoBoleto(achado) !== p.cb.slice(0, 3)) return MSG_COD_SIS.trocado;
+  return MSG_COD_SIS.diferente;
+}
+
 // a conferência: devolve as linhas da tabela, cada uma com
 // { grupo, titulo, boleto, linha, bloqueio, motivo, avisos }
+//   grupo    = bolOk | bolVerif | bolCodSis | bolJa | bolSem | bolFolha | bolDda
 //   linha    = linha digitável (47) só quando dá para usar; '' quando bloqueado
 //   bloqueio = por que o código do DDA foi bloqueado
 //   motivo   = o que verificar (grupo Verificação)
@@ -1902,40 +2006,54 @@ function conferirBoletos(dda, titulos){
   const add = (grupo, titulo, boleto, extra) =>
     linhas.push({ grupo, titulo, boleto, linha:'', bloqueio:'', motivo:'', avisos:[], ...extra });
 
-  // 1) títulos que já têm código no sistema: só confere o código
-  const semCodigo = [], problemas = [];
+  // 1) títulos que já têm código no sistema: ficam fora da conferência, só o código
+  //    é conferido (validaBoleto) e procurado no DDA. Folha e impostos ficam de fora.
+  const semCodigo = [], codErrado = [];
   titulos.forEach((t, ref) => {
     const tt = { ...t, ref };
-    if(!t.temCodigo){ semCodigo.push(tt); return; }
-    const onde = `linha ${t.linhaExcel} do relatório`;
-    if(t.codigoSuspeito){
-      problemas.push({ t:tt, invalido:true, motivo:`código digitado no sistema (${onde}) ilegível: não está gravado como texto e pode ter perdido dígitos; use o do DDA` });
+    if(!t.temCodigo){
+      const tipo = tipoFolha(t.nome);
+      if(tipo) add('bolFolha', tt, null, { tipoFolha: tipo });
+      else semCodigo.push(tt);
       return;
     }
+    if(t.codigoSuspeito){ codErrado.push({ t:tt, invalido:true, detalhe:'ilegível: a célula não está gravada como texto e pode ter perdido dígitos' }); return; }
     const e = validaEstrutura(t.codigoTexto);
     if(e.tipo==='consumo'){ add('bolJa', tt, null, { avisos:['conta de consumo (não é conferida como boleto)'] }); return; }
-    if(!e.ok){ problemas.push({ t:tt, invalido:true, motivo:`código digitado no sistema (${onde}) é inválido: ${e.motivo}; use o do DDA` }); return; }
+    if(!e.ok){ codErrado.push({ t:tt, invalido:true, detalhe:e.motivo }); return; }
     const b = porCb.get(e.cb);
-    if(!b){ problemas.push({ t:tt, motivo:`código digitado no sistema (${onde}) não está no DDA; use o do DDA` }); return; }
-    if(usados.has(b.idx)){ problemas.push({ t:tt, motivo:`o mesmo código do sistema (${onde}) está em outro título; use o do DDA` }); return; }
+    if(!b){ codErrado.push({ t:tt, cb:e.cb }); return; }
+    if(usados.has(b.idx)){ codErrado.push({ t:tt, cb:e.cb, repetido:true }); return; }
     const v = validaBoleto(t.codigoTexto, { banco:b.banco, valor:b.valor, venc:b.venc });
-    if(!v.ok){ problemas.push({ t:tt, invalido:true, motivo:`código digitado no sistema (${onde}) é inválido: ${v.motivo}; use o do DDA` }); return; }
+    if(!v.ok){ codErrado.push({ t:tt, invalido:true, detalhe:v.motivo }); return; }
     usados.add(b.idx);
     // fora da conferência: os motivos de Verificação viram só aviso
     const avisos = [...v.avisos];
-    if(outraEmpresa(t.nome, b.beneficiario))
-      avisos.push(cedidoAFactoring(b.beneficiario) ? 'título cedido a factoring/fundo' : 'confirmar se é o mesmo fornecedor');
+    if(outraEmpresa(t.nome, b.beneficiario)) avisos.push(motivoOutraEmpresa(b.beneficiario));
     if(b.comDesconto && b.valorAPagar!==null) avisos.push(`Desconto/abatimento: pagar ${brl(b.valorAPagar)}`);
     add('bolJa', tt, b, { linha:v.linha, avisos });
   });
 
-  // 2) os títulos sem código e os de código errado procuram o boleto no DDA
-  //    (regras em PAREAMENTO, acima). Os de código errado só entram no um para um.
-  const motivoDe = new Map(problemas.map(p => [p.t.ref, p.motivo]));
-  const invalidoDe = new Set(problemas.filter(p => p.invalido).map(p => p.t.ref));
   const genericas = palavrasGenericas(titulos.map(t => t.nome), dda.map(b => b.beneficiario));
-  const tits = [...semCodigo, ...problemas.map(p => p.t)]
-    .map(t => ({ ...t, palavras: palavrasDoNome(t.nome, genericas), nf: nfSinal(t.doc) }));
+
+  // 1b) código do sistema errado ou fora do DDA: procura o boleto certo (etapa 4).
+  //     O boleto achado fica "usado" e não entra mais na conferência.
+  codErrado.forEach(p => {
+    const achado = procuraBoletoDoCodigo(p, boletos.filter(b => !usados.has(b.idx)), genericas);
+    if(achado) usados.add(achado.idx);
+    const detalhes = [
+      p.detalhe && `código do sistema ${p.detalhe}`,
+      `código do sistema na linha ${p.t.linhaExcel} do relatório`,
+      achado && !achado.val.ok && `o código do DDA também está bloqueado (${achado.val.motivo}): peça o boleto ao fornecedor`,
+      achado && outraEmpresa(p.t.nome, achado.beneficiario) && motivoOutraEmpresa(achado.beneficiario),
+      achado && achado.comDesconto && achado.valorAPagar!==null && `Desconto/abatimento: pagar ${brl(achado.valorAPagar)}`,
+    ].filter(Boolean);
+    add('bolCodSis', p.t, achado, { linha: achado && achado.val.ok ? achado.val.linha : '',
+      motivo: [fraseCodSis(p, achado), ...detalhes].join(' · '), codigoSistemaInvalido: !!p.invalido });
+  });
+
+  // 2) os títulos sem código procuram o boleto no DDA (regras em PAREAMENTO, acima)
+  const tits = semCodigo.map(t => ({ ...t, palavras: palavrasDoNome(t.nome, genericas), nf: nfSinal(t.doc) }));
   const livres = boletos.filter(b => !usados.has(b.idx))
     .map(b => ({ ...b, palavras: palavrasDoNome(b.beneficiario, genericas) }));
   const titulo = s => ({ ...titulos[s.ref], ref:s.ref });
@@ -1950,8 +2068,7 @@ function conferirBoletos(dda, titulos){
   const bFirme = new Set(firmes.map(p => p.b.idx));
 
   // 2.2) boleto agrupado: boletos sem par firme x títulos sem par + provisórios
-  const candidatos = [...tits.filter(t => !tPareado.has(t.ref)), ...provisorios.map(p => p.t)]
-    .filter(t => !motivoDe.has(t.ref));
+  const candidatos = [...tits.filter(t => !tPareado.has(t.ref)), ...provisorios.map(p => p.t)];
   const { grupos, ambiguos } = agruparBoletos(livres.filter(b => !bFirme.has(b.idx)), candidatos);
   const tNoGrupo = new Set(grupos.flatMap(g => g.titulos.map(t => t.ref)));
   // boleto ambíguo também fica "ocupado": vai sozinho para a Verificação
@@ -1964,11 +2081,15 @@ function conferirBoletos(dda, titulos){
   const poePar = (t, bo, s, extra) => {
     const v = bo.val;
     const avisos = [...(extra.avisos || [])];
-    const motivos = [...(extra.motivos || [])];
+    const motivos = [];
     if(!v.ok) motivos.push('código do boleto no DDA bloqueado');
     if(s && !s.valor) motivos.push(`Valor diferente: boleto ${brl(bo.valor)} x sistema ${brl(t.valor)}`);
+    if(s && s.nome && s.valor && !s.nf){
+      const nfBoleto = umDigitoDiferente(nfSinal(t.doc), bo.doc);
+      if(nfBoleto) motivos.push(`O boleto é da NF ${nfBoleto} e no sistema está NF ${t.doc}; confirmar (pode ser erro de digitação)`);
+    }
     const outra = outraEmpresa(t.nome, bo.beneficiario) || (s && !s.nome);
-    if(outra) motivos.push(cedidoAFactoring(bo.beneficiario) ? 'título cedido a factoring/fundo' : 'confirmar se é o mesmo fornecedor');
+    if(outra) motivos.push(motivoOutraEmpresa(bo.beneficiario));
     if(bo.comDesconto && bo.valorAPagar!==null) motivos.push(`Desconto/abatimento: pagar ${brl(bo.valorAPagar)}`);
     (v.avisos || []).forEach(a => (a.startsWith('vencimento do código') ? motivos : avisos).push(a));
     if(!mesmaData(t.venc, bo.venc)) avisos.push('vencimento no sistema diferente do DDA');
@@ -1977,11 +2098,7 @@ function conferirBoletos(dda, titulos){
       ...(extra.agrupado ? { agrupado: extra.agrupado } : {}) });
   };
 
-  finais.forEach(({ t: tp, b: bp, s }) => {
-    const bo = boleto(bp);
-    const motivos = motivoDe.has(tp.ref) ? [motivoDe.get(tp.ref)] : [];
-    poePar(titulo(tp), bo, s, { motivos });
-  });
+  finais.forEach(({ t: tp, b: bp, s }) => poePar(titulo(tp), boleto(bp), s, {}));
 
   grupos.forEach(g => {
     const bo = boleto(g.b), n = g.titulos.length;
@@ -2007,26 +2124,42 @@ function conferirBoletos(dda, titulos){
   // 3) o resto: título sem boleto e boleto sem título
   const tFinal = new Set([...finais.map(p => p.t.ref), ...tNoGrupo]);
   const bFinal = new Set([...finais.map(p => p.b.idx), ...bNoGrupo]);
-  tits.filter(t => !tFinal.has(t.ref)).forEach(s => {
-    if(motivoDe.has(s.ref)) add('bolVerif', titulo(s), null, { motivo: motivoDe.get(s.ref) + ' (boleto não encontrado no DDA)',
-                                                               codigoSistemaInvalido: invalidoDe.has(s.ref) });
-    else add('bolSem', titulo(s), null, {});
-  });
+  const semBoleto = tits.filter(t => !tFinal.has(t.ref));
+  semBoleto.forEach(s => add('bolSem', titulo(s), null, {}));
+
+  // 3.1) boleto que não fecha: sobrou um boleto de um fornecedor (mesmas 5 primeiras
+  //      letras) que tem títulos sem boleto, e a soma deles é diferente do boleto.
+  //      O boleto vai para a Verificação; as NFs continuam em "Sem boleto".
   livres.filter(b => !bFinal.has(b.idx)).forEach(b => {
-    const bo = boleto(b);
-    add('bolDda', null, bo, { linha: bo.val.ok ? bo.val.linha : '', bloqueio: bo.val.ok ? '' : bo.val.motivo, avisos:[...(bo.val.avisos || [])] });
+    const bo = boleto(b), v = bo.val;
+    const ini = inicioDoNome(bo.beneficiario);
+    const doFornecedor = ini ? semBoleto.filter(t => inicioDoNome(t.nome) === ini) : [];
+    const soma = doFornecedor.reduce((s, t) => s + emCentavos(t.valor), 0);
+    const alvo = emCentavos(bo.valor);
+    const extra = { linha: v.ok ? v.linha : '', bloqueio: v.ok ? '' : v.motivo, avisos:[...(v.avisos || [])] };
+    if(doFornecedor.length && soma !== alvo){
+      const n = doFornecedor.length;
+      const as = n === 1 ? 'a NF' : `as ${n} NFs`;
+      const dica = soma < alvo ? 'O boleto deve incluir nota que não está no relatório; peça o demonstrativo.'
+                               : 'O boleto não paga todas as notas; peça o demonstrativo para saber quais ele paga.';
+      add('bolVerif', null, bo, { ...extra, naoFecha:true, motivo:
+        `Boleto de ${brl(bo.valor)} do fornecedor ${bo.beneficiario} não fecha com ${as} do sistema ` +
+        `(soma ${brl(soma / 100)}, diferença ${brl(Math.abs(alvo - soma) / 100)}). ${dica}` });
+      return;
+    }
+    add('bolDda', null, bo, extra);
   });
 
   marcaDuplicidade(linhas);
 
   // ordem: o que precisa de atenção primeiro
-  const ORDEM = ['bolVerif', 'bolOk', 'bolDda', 'bolSem', 'bolJa'];
+  const ORDEM = ['bolVerif', 'bolOk', 'bolCodSis', 'bolDda', 'bolSem', 'bolFolha', 'bolJa'];
   linhas.sort((a, b) => ORDEM.indexOf(a.grupo) - ORDEM.indexOf(b.grupo));
   linhas.forEach(l => {
     const t = l.titulo, b = l.boleto;
     l.grupos = [l.grupo];
     // boleto agrupado: cada título entra com o saldo dele (a soma dá o valor do boleto)
-    l.valor = l.agrupado ? t.valor : (b ? b.valor : t.valor);
+    l.valor = l.agrupado || !b ? t.valor : b.valor;
     const textos = [t && t.nome, b && b.beneficiario, t && t.doc, t && t.prf, t && t.fornecedor, b && b.doc, b && b.cnpj,
                     b && b.banco, dataBR(t ? t.venc : b.venc), brl(l.valor), l.motivo, l.bloqueio];
     const digitos = [centavos(l.valor), t && centavos(t.valor), t && apenasDigitos(t.doc), t && t.fornecedor,
@@ -2039,10 +2172,12 @@ function conferirBoletos(dda, titulos){
 
 /* -------------------------------------------------------------------
    TELA E EXCEL DA CONFERÊNCIA DE BOLETOS
-   O resultado do conferirBoletos é mostrado em 3 abas, iguais na tela e no
-   Excel: Com boleto, Verificação e Sem boleto. Cada linha tem um status; o
-   nome e a cor de cada status ficam só em STATUS_BOL (tela, Excel e Ajuda).
-   As cores são as mesmas do style.css (variáveis --conferido-fundo etc.).
+   O resultado do conferirBoletos é mostrado em 4 abas, iguais na tela e no
+   Excel: Com boleto, Verificação, Sem boleto e DDA sem título no sistema.
+   Cada linha tem um status; o nome e a cor de cada status ficam só em
+   STATUS_BOL (tela, Excel e Ajuda). As cores são as mesmas do style.css.
+   Se o período tem mais de um vencimento, cada aba é separada em faixas por
+   data, com o subtotal de cada data (linhas 'faixa' e 'subtotal').
    ------------------------------------------------------------------- */
 const STATUS_BOL = {
   ok:      { nome:'Com boleto',       fundo:'FFE2F2E8', texto:'FF17653B',
@@ -2055,18 +2190,38 @@ const STATUS_BOL = {
              ajuda:'Precisa de conferência antes de pagar. A coluna "O que verificar" diz o quê.' },
   bloq:    { nome:'Bloqueado',        fundo:'FFFBE4E1', texto:'FF9A2A1C',
              ajuda:'O código de barras não passou na conferência (tamanho, dígitos, banco ou valor). Não há linha digitável para copiar: peça o boleto certo.' },
+  codsis:  { nome:'Código do sistema', fundo:'FFFBE4E1', texto:'FF9A2A1C',
+             ajuda:'O título já tinha código no sistema, mas ele é inválido, de outro boleto ou não está no DDA. O site nunca corrige o código: corrija o lançamento. Quando há linha digitável, ela é a do boleto do DDA.' },
   sem:     { nome:'Sem boleto',       fundo:'FFECEFEE', texto:'FF44534E',
              ajuda:'Título do sistema sem boleto no DDA. Pode ser Pix, transferência ou boleto ainda não emitido.' },
   consumo: { nome:'Conta de consumo', fundo:'FFECEFEE', texto:'FF44534E',
              ajuda:'Conta de consumo (energia, água, telefone...). Não é boleto bancário e não é conferida aqui.' },
+  folha:   { nome:'Folha e impostos', fundo:'FFE3E7E6', texto:'FF44534E',
+             ajuda:'Consignado, INSS, FGTS, IRRF, DARF, folha, férias, rescisão... Nunca vêm no DDA: aparecem somados por tipo no fim da aba "Sem boleto".' },
+  dda:     { nome:'Só no DDA',        fundo:'FFECE7F8', texto:'FF4B3A8C',
+             ajuda:'Boleto do DDA que não casou com nenhum título. Veja se falta lançar a nota. Se ninguém reconhecer o boleto, não pague.' },
 };
+// linhas de faixa (data) e subtotal: não são status, só formatação
+const ESTILO_FAIXA = { faixa:{ fundo:'FFD5E3E1', texto:'FF0F4C47' }, subtotal:{ fundo:'FFF4F6F5', texto:'FF0F4C47' } };
+const ehFaixa = r => r.status === 'faixa' || r.status === 'subtotal';
+
 const ABAS_BOL = [
-  { id:'ok',    nome:'Com boleto',  planilha:'Com boleto' },
-  { id:'verif', nome:'Verificação', planilha:'Verificacao' },
-  { id:'sem',   nome:'Sem boleto',  planilha:'Sem boleto' },
+  { id:'ok',    nome:'Com boleto',                planilha:'Com boleto' },
+  { id:'verif', nome:'Verificação',               planilha:'Verificacao' },
+  { id:'sem',   nome:'Sem boleto',                planilha:'Sem boleto' },
+  { id:'dda',   nome:'DDA sem título no sistema', planilha:'DDA sem titulo' },
 ];
-// colunas de cada aba (iguais na tela e no Excel)
+// colunas de cada aba (iguais na tela e no Excel). O valor é sempre a 4ª coluna.
 function colunasAbaBol(aba){
+  if(aba === 'dda') return [
+    { id:'fornecedor', cab:'Beneficiário',     w:44 },
+    { id:'nf',         cab:'Nº Doc.',          w:18, texto:true },
+    { id:'venc',       cab:'Vencimento',       w:13 },
+    { id:'valor',      cab:'Valor',            w:16 },
+    { id:'cb',         cab:'Código de Barras', w:50, texto:true },
+    { id:'linha',      cab:'Linha Digitável',  w:52, texto:true },
+    { id:'verificar',  cab:'Observação',       w:50 },
+  ];
   const cols = [
     { id:'codForn',    cab:'Cód. Fornecedor', w:16, texto:true },
     { id:'fornecedor', cab:'Fornecedor',      w:44 },
@@ -2084,49 +2239,95 @@ const ordemFornNf = (a, b) => normaliza(a.fornecedor).localeCompare(normaliza(b.
                               String(a.nf).localeCompare(String(b.nf), 'pt-BR', { numeric:true });
 
 // uma linha de aba. conta = entra na quantidade e no total do cartão (as NFs que
-// compõem um boleto agrupado não contam: o boleto já conta uma vez)
-function linhaAbaBol(status, { t, b, linha, valor, verificar, nf, obs, conta = true, bloco }){
+// compõem um boleto agrupado não contam: o boleto já conta uma vez).
+// qtd = quantos títulos a linha representa (a linha de um tipo de folha soma vários)
+function linhaAbaBol(status, { t, b, linha, valor, verificar, nf, obs, conta = true, bloco, venc, qtd = 1 }){
   const r = {
-    status, bloco, conta,
+    status, bloco, conta, qtd,
     codForn: t ? String(t.fornecedor || '') : '',
     fornecedor: t ? t.nome : (b ? b.beneficiario : ''),
     nf: nf !== undefined ? nf : (t ? String(t.doc || '') : ''),
+    venc: dataBR(venc !== undefined ? venc : (t ? t.venc : (b ? b.venc : ''))) || '',
     valor, linha: linha || '', cb: linha ? linhaParaBarras(linha) : '',
     verificar: verificar || '', obs: obs || [],
   };
   r.dec = r.cb ? decodifica(r.cb) : null;
-  r.texto = normaliza([r.codForn, r.fornecedor, b && b.beneficiario, r.nf, b && b.doc, brl(valor), r.verificar].filter(Boolean).join(' | '));
+  r.texto = normaliza([r.codForn, r.fornecedor, b && b.beneficiario, r.nf, b && b.doc, r.venc, brl(valor), r.verificar].filter(Boolean).join(' | '));
   r.digitos = [centavos(valor), r.codForn, apenasDigitos(r.nf), b && apenasDigitos(b.doc), r.linha, r.cb].filter(Boolean).join('|');
   return r;
 }
+// linha de faixa (data) ou subtotal: nunca casa com a busca
+function linhaFaixa(status, rotulo, valor, bloco){
+  return { status, bloco, conta:false, qtd:0, codForn:'', fornecedor:rotulo, nf:'', venc:'', valor, linha:'', cb:'',
+           verificar:'', obs:[], dec:null, texto:'', digitos:'' };
+}
 
-// distribui as linhas do conferirBoletos nas 3 abas
-function montaAbasBol(linhas){
-  const ok = [], grupos = new Map(), amarelos = [], vermelhos = [], sem = [];
+const rotuloData = venc => {
+  const d = datasDoTexto(venc)[0];
+  return d ? `Vencimento ${d.txt} (${NOMES_DIA[new Date(d.t).getUTCDay()]})` : 'Sem vencimento';
+};
+
+// separa uma aba em faixas por data (pela data da 1ª linha de cada bloco), com o
+// subtotal de cada data. Dentro de cada data a ordem da aba é mantida.
+function faixasPorData(linhas, proximoBloco){
+  const blocos = [];
+  linhas.forEach(r => {
+    const ult = blocos[blocos.length - 1];
+    if(ult && ult.bloco === r.bloco) ult.linhas.push(r);
+    else blocos.push({ bloco:r.bloco, venc:r.venc, linhas:[r] });
+  });
+  const chave = v => { const d = datasDoTexto(v)[0]; return d ? d.t : Infinity; };
+  const porData = new Map();
+  blocos.forEach(b => {
+    const k = chave(b.venc);
+    porData.set(k, [...(porData.get(k) || []), b]);
+  });
+  const out = [];
+  [...porData.keys()].sort((a, b) => a - b).forEach(k => {
+    const bs = porData.get(k);
+    const rot = rotuloData(bs[0].venc);
+    const ls = bs.flatMap(b => b.linhas);
+    const res = resumoAba(ls);
+    out.push(linhaFaixa('faixa', rot, null, proximoBloco()), ...ls,
+             linhaFaixa('subtotal', `Subtotal ${rot.replace('Vencimento ', '')} · ${res.qtd === 1 ? '1 item' : res.qtd + ' itens'}`, res.total, proximoBloco()));
+  });
+  return out;
+}
+
+// distribui as linhas do conferirBoletos nas 4 abas.
+// opcoes.porData = o período do relatório tem mais de um vencimento (faixas por data)
+function montaAbasBol(linhas, opcoes = {}){
+  const ok = [], grupos = new Map(), amarelos = [], vermelhos = [], codSis = [], sem = [], dda = [], folha = new Map();
   const juntaVerificar = l => [l.bloqueio && 'Bloqueado: ' + l.bloqueio, l.motivo, ...l.avisos].filter(Boolean).join(' · ');
   let bloco = 0;
+  const proximoBloco = () => ++bloco;
+  let jaConferidos = 0;
   linhas.forEach(l => {
     const t = l.titulo, b = l.boleto;
     if(l.agrupado){ grupos.set(l.agrupado.idx, [...(grupos.get(l.agrupado.idx) || []), l]); return; }
+    if(l.grupo === 'bolFolha'){ folha.set(l.tipoFolha, [...(folha.get(l.tipoFolha) || []), t]); return; }
     bloco++;
     if(l.grupo === 'bolOk'){
       ok.push(linhaAbaBol('ok', { t, b, linha:l.linha, valor:b.valor, obs:l.avisos, bloco }));
     }else if(l.grupo === 'bolJa' && !b){
       sem.push(linhaAbaBol('consumo', { t, valor:t.valor, bloco }));
     }else if(l.grupo === 'bolJa'){
-      // código já lançado no sistema, igual ao do DDA: sem aviso é "Com boleto"
+      // código já lançado no sistema e igual ao do DDA: fora da conferência. Só aparece
+      // (na Verificação) se tiver algum aviso; senão só entra na contagem.
       if(l.avisos.length) amarelos.push(linhaAbaBol('verif', { t, b, linha:l.linha, valor:b.valor, bloco,
         verificar:'Código já lançado no sistema. ' + l.avisos.join(' · ') }));
-      else ok.push(linhaAbaBol('ok', { t, b, linha:l.linha, valor:b.valor, obs:['código já lançado no sistema'], bloco }));
+      else jaConferidos++;
+    }else if(l.grupo === 'bolCodSis'){
+      codSis.push(linhaAbaBol('codsis', { t, b, linha:l.linha, valor:t.valor, verificar: juntaVerificar(l), bloco }));
     }else if(l.grupo === 'bolSem'){
       sem.push(linhaAbaBol('sem', { t, valor:t.valor, bloco }));
     }else if(l.grupo === 'bolDda'){
-      const texto = `Boleto no DDA sem título no sistema${b.doc ? ` (Nº Doc. ${b.doc})` : ''}: veja se falta lançar a nota. Se ninguém reconhecer o boleto, não pague.`;
-      const verificar = [l.bloqueio && 'Bloqueado: ' + l.bloqueio, l.motivo || texto, ...l.avisos].filter(Boolean).join(' · ');
-      (l.bloqueio ? vermelhos : amarelos).push(linhaAbaBol(l.bloqueio ? 'bloq' : 'verif', { t:null, b, linha:l.linha, valor:b.valor, verificar, bloco }));
+      const obs = [l.bloqueio && 'Bloqueado: ' + l.bloqueio, ...l.avisos].filter(Boolean).join(' · ');
+      dda.push(linhaAbaBol(l.bloqueio ? 'bloq' : 'dda', { t:null, b, linha:l.linha, valor:b.valor, nf:String(b.doc || ''),
+        verificar: obs, bloco }));
     }else{
-      // bolVerif: vermelho quando o código não pode ser usado (do DDA bloqueado ou do sistema inválido sem boleto no DDA)
-      const bloq = !!l.bloqueio || (!b && l.codigoSistemaInvalido);
+      // bolVerif: vermelho quando o código do DDA não pode ser usado
+      const bloq = !!l.bloqueio;
       (bloq ? vermelhos : amarelos).push(linhaAbaBol(bloq ? 'bloq' : 'verif', { t, b, linha:l.linha,
         valor: b ? b.valor : t.valor, verificar: juntaVerificar(l), bloco }));
     }
@@ -2142,63 +2343,155 @@ function montaAbasBol(linhas){
     const extras = [...new Set(ls.flatMap(l => (l.motivo || '').split(' · ').filter(Boolean)))];
     const verificar = [bloqueado && 'Bloqueado: ' + ls[0].bloqueio,
       `Boleto único: a soma das ${n} NFs abaixo dá ${brl(b.valor)}. Pagar uma vez só.`, ...extras].filter(Boolean).join(' · ');
+    const venc = ls[0].titulo.venc;
     const cab = linhaAbaBol(bloqueado ? 'bloq' : 'grupo', { t:null, b, linha: bloqueado ? '' : ls[0].linha, valor:b.valor,
-      nf:`${n} NFs`, verificar, bloco });
+      nf:`${n} NFs`, verificar, bloco, venc });
     cab.codForn = codigos.length === 1 ? String(codigos[0]) : '';
     cab.fornecedor = ls[0].titulo.nome;
     cab.texto = normaliza([cab.texto, ...ls.map(l => l.titulo.doc)].join(' | '));
-    const filhos = ls.map(l => linhaAbaBol('compoe', { t:l.titulo, b, valor:l.titulo.valor, verificar:'compõe o boleto acima', conta:false, bloco }));
+    const filhos = ls.map(l => linhaAbaBol('compoe', { t:l.titulo, b, valor:l.titulo.valor, verificar:'compõe o boleto acima', conta:false, bloco, venc }));
     return [cab, ...filhos];
   }).sort((x, y) => ordemFornNf(x[0], y[0]));
 
-  return {
+  // folha e impostos: um bloco cinza no fim da aba "Sem boleto", uma linha por tipo
+  const blocoFolha = [];
+  if(folha.size){
+    const b0 = proximoBloco();
+    blocoFolha.push(linhaFaixa('faixa', 'Folha e impostos (não vêm no DDA)', null, b0));
+    TIPOS_FOLHA.map(([tipo]) => tipo).filter(tipo => folha.has(tipo)).forEach(tipo => {
+      const ts = folha.get(tipo);
+      const codigos = [...new Set(ts.map(t => String(t.fornecedor)))];
+      const nomes = [...new Set(ts.map(t => t.nome))];
+      const r = linhaAbaBol('folha', { t:null, valor: somaValores(ts), nf:`${ts.length} ${ts.length === 1 ? 'título' : 'títulos'}`,
+        bloco: proximoBloco(), venc:'', qtd: ts.length });
+      r.codForn = codigos.length <= 3 ? codigos.join(', ') : `${codigos.slice(0, 3).join(', ')} e mais ${codigos.length - 3}`;
+      r.fornecedor = nomes.length === 1 ? `${tipo}: ${nomes[0]}` : `${tipo} (${nomes.length} fornecedores)`;
+      r.texto = normaliza([r.codForn, r.fornecedor, ...nomes, tipo].join(' | '));
+      r.digitos = [centavos(r.valor), ...codigos].join('|');
+      blocoFolha.push(r);
+    });
+    const res = resumoAba(blocoFolha);
+    blocoFolha.push(linhaFaixa('subtotal', `Subtotal folha e impostos · ${res.qtd} ${res.qtd === 1 ? 'título' : 'títulos'}`, res.total, proximoBloco()));
+  }
+
+  const abas = {
     ok: ok.sort(ordemFornNf),
-    verif: [...blocosGrupo.flat(), ...amarelos.sort(ordemFornNf), ...vermelhos.sort(ordemFornNf)],
+    verif: [...blocosGrupo.flat(), ...amarelos.sort(ordemFornNf), ...vermelhos.sort(ordemFornNf), ...codSis.sort(ordemFornNf)],
     sem: sem.sort(ordemFornNf),
+    dda: dda.sort((a, b) => b.valor - a.valor || ordemFornNf(a, b)),
   };
+  // faixas por data só se o período tem mais de um vencimento e as linhas têm mais de uma data
+  const datas = new Set(Object.values(abas).flat().map(r => r.venc).filter(Boolean));
+  const porData = !!opcoes.porData && datas.size > 1;
+  if(porData) Object.keys(abas).forEach(k => { abas[k] = faixasPorData(abas[k], proximoBloco); });
+  abas.sem.push(...blocoFolha);
+  abas.porData = porData;
+  abas.jaConferidos = jaConferidos;
+  return abas;
 }
 
 const resumoAba = linhas => {
   const conta = linhas.filter(r => r.conta);
-  return { qtd: conta.length, total: somaValores(conta) };
+  return { qtd: conta.reduce((s, r) => s + (r.qtd || 1), 0), total: somaValores(conta) };
 };
 
-/* ---------- tela ---------- */
+/* ---------- tela ----------
+   Tudo o que vem dos arquivos entra na tela por textContent (nunca innerHTML). */
 let bolAbas = null, bolAbaAtiva = 'ok', bolBuscaTxt = '';
 
-function celulaLinhaDigitavel(r){
-  if(!r.linha) return r.status === 'compoe' ? '<span class="sub">compõe o boleto acima</span>' : '—';
-  const d = r.dec;
-  return `<span class="mono linha-dig">${escapa(formataLinha(r.linha))}</span>` +
-         `<span class="sub mono">Banco ${escapa(d.banco)} · ${brl(d.valor)} · venc. ${escapa(d.venc || 'sem vencimento')}</span>` +
-         `<button type="button" class="btn-copiar" data-linha="${escapa(r.linha)}">Copiar</button>`;
+// cria um elemento com classe e texto (textContent)
+function cria(tag, classe, texto){
+  const e = document.createElement(tag);
+  if(classe) e.className = classe;
+  if(texto !== undefined && texto !== null) e.textContent = String(texto);
+  return e;
+}
+function criaCom(tag, classe, filhos){
+  const e = cria(tag, classe);
+  filhos.filter(Boolean).forEach(f => e.appendChild(f));
+  return e;
 }
 
-function linhaAbaHtml(r, aba){
+function celulaLinhaDigitavel(r){
+  const td = cria('td', 'cod-bol');
+  if(!r.linha){
+    if(r.status === 'compoe') td.appendChild(cria('span', 'sub', 'compõe o boleto acima'));
+    else td.textContent = '—';
+    return td;
+  }
+  const d = r.dec;
+  td.appendChild(cria('span', 'mono linha-dig', formataLinha(r.linha)));
+  // banco, valor e vencimento LIDOS DO CÓDIGO
+  td.appendChild(cria('span', 'sub mono', `Banco ${d.banco} · ${brl(d.valor)} · venc. ${d.venc || 'sem vencimento'}`));
+  const btn = cria('button', 'btn-copiar', 'Copiar');
+  btn.type = 'button';
+  btn.dataset.linha = r.linha;
+  td.appendChild(btn);
+  return td;
+}
+
+function linhaAbaTr(r, aba, cols){
+  const tr = cria('tr', 'st-' + r.status);
+  if(r.status === 'faixa'){
+    const td = cria('td', 'faixa-data', r.fornecedor);
+    td.colSpan = cols.length;
+    tr.appendChild(td);
+    return tr;
+  }
+  if(r.status === 'subtotal'){
+    const td = cria('td', '', r.fornecedor); td.colSpan = 3; tr.appendChild(td);
+    tr.appendChild(cria('td', 'num mono', brl(r.valor)));
+    if(cols.length > 4){ const resto = cria('td'); resto.colSpan = cols.length - 4; tr.appendChild(resto); }
+    return tr;
+  }
   const st = STATUS_BOL[r.status];
-  const marca = (aba !== 'ok' && !(aba === 'sem' && r.status === 'sem')) ? `<span class="status st-${r.status}">${escapa(st.nome)}</span>` : '';
-  const obs = r.obs.map(o => `<span class="sub">${escapa(o)}</span>`).join('');
-  let html = `<td class="mono">${escapa(r.codForn) || '—'}</td><td class="forn">${marca}<span class="forn-nome">${escapa(r.fornecedor)}</span>${obs}</td>` +
-             `<td class="mono">${escapa(r.nf) || '—'}</td><td class="num mono">${brl(r.valor)}</td>`;
-  if(aba !== 'sem') html += `<td class="mono cod">${r.cb ? escapa(r.cb) : '—'}</td><td class="cod-bol">${celulaLinhaDigitavel(r)}</td>`;
-  if(aba === 'verif') html += `<td class="verificar">${escapa(r.verificar)}</td>`;
-  return `<tr class="st-${r.status}">${html}</tr>`;
+  const mostraMarca = aba === 'verif' || (aba === 'sem' && r.status !== 'sem') || (aba === 'dda' && r.status !== 'dda');
+  cols.forEach(c => {
+    if(c.id === 'fornecedor'){
+      tr.appendChild(criaCom('td', 'forn', [
+        mostraMarca && cria('span', 'status st-' + r.status, st.nome),
+        cria('span', 'forn-nome', r.fornecedor),
+        ...r.obs.map(o => cria('span', 'sub', o)),
+      ]));
+    }else if(c.id === 'valor') tr.appendChild(cria('td', 'num mono', brl(r.valor)));
+    else if(c.id === 'cb') tr.appendChild(cria('td', 'mono cod', r.cb || '—'));
+    else if(c.id === 'linha') tr.appendChild(celulaLinhaDigitavel(r));
+    else if(c.id === 'verificar') tr.appendChild(cria('td', 'verificar', r.verificar));
+    else tr.appendChild(cria('td', 'mono', r[c.id] || '—'));
+  });
+  return tr;
 }
 
 function desenhaAbaBol(){
   if(!bolAbas) return;
   const aba = bolAbaAtiva, cols = colunasAbaBol(aba);
   const todas = bolAbas[aba];
-  // a busca mostra o bloco inteiro (boleto agrupado + suas NFs) quando qualquer linha dele casa
-  const blocos = new Set(todas.filter(r => buscaCasa(r, bolBuscaTxt)).map(r => r.bloco));
-  const visiveis = todas.filter(r => blocos.has(r.bloco));
-  $('bolCabecalho').innerHTML = '<tr>' + cols.map(c => `<th${c.id === 'valor' ? ' class="num"' : ''}>${c.cab}</th>`).join('') + '</tr>';
-  const vazio = bolBuscaTxt.trim() ? `Nada encontrado para “${escapa(bolBuscaTxt.trim())}” nesta aba.` : MSG_VAZIO_BOL[aba];
-  $('bolCorpo').innerHTML = visiveis.length ? visiveis.map(r => linhaAbaHtml(r, aba)).join('')
-                                            : `<tr><td class="vazio" colspan="${cols.length}">${vazio}</td></tr>`;
+  // a busca mostra o bloco inteiro (boleto agrupado + suas NFs) quando qualquer linha dele casa;
+  // com busca, as faixas de data e os subtotais somem
+  const busca = bolBuscaTxt.trim();
+  const blocos = new Set(todas.filter(r => !ehFaixa(r) && buscaCasa(r, bolBuscaTxt)).map(r => r.bloco));
+  const visiveis = todas.filter(r => busca ? blocos.has(r.bloco) && !ehFaixa(r) : true);
+
+  const trCab = cria('tr');
+  cols.forEach(c => trCab.appendChild(cria('th', c.id === 'valor' ? 'num' : '', c.cab)));
+  $('bolCabecalho').replaceChildren(trCab);
+
+  if(visiveis.length){
+    $('bolCorpo').replaceChildren(...visiveis.map(r => linhaAbaTr(r, aba, cols)));
+  }else{
+    const td = cria('td', 'vazio', busca ? `Nada encontrado para “${busca}” nesta aba.` : MSG_VAZIO_BOL[aba]);
+    td.colSpan = cols.length;
+    $('bolCorpo').replaceChildren(criaCom('tr', '', [td]));
+  }
   const res = resumoAba(visiveis);
-  $('bolRodape').innerHTML = `<tr><td colspan="3">Total · ${res.qtd === 1 ? '1 item' : res.qtd + ' itens'}</td>` +
-                             `<td class="num mono">${brl(res.total)}</td>${cols.length > 4 ? `<td colspan="${cols.length - 4}"></td>` : ''}</tr>`;
+  const trTot = cria('tr');
+  const tdTot = cria('td', '', `Total${bolAbas.porData && !busca ? ' geral' : ''} · ${res.qtd === 1 ? '1 item' : res.qtd + ' itens'}`);
+  tdTot.colSpan = 3;
+  trTot.appendChild(tdTot);
+  trTot.appendChild(cria('td', 'num mono', brl(res.total)));
+  if(cols.length > 4){ const resto = cria('td'); resto.colSpan = cols.length - 4; trTot.appendChild(resto); }
+  $('bolRodape').replaceChildren(trTot);
+
   document.querySelectorAll('#bolResumo .stat').forEach(card => {
     const ativo = card.dataset.aba === aba;
     card.classList.toggle('ativo', ativo);
@@ -2209,12 +2502,13 @@ const MSG_VAZIO_BOL = {
   ok:    'Nenhum título com boleto sem pendência. Veja a Verificação.',
   verif: 'Nada para verificar.',
   sem:   'Todo título do sistema tem boleto ou código.',
+  dda:   'Todo boleto do DDA casou com um título do sistema.',
 };
 
 function mostraAbasBol(abas){
   bolAbas = abas;
   document.querySelectorAll('#bolResumo .stat').forEach(card => {
-    const res = resumoAba(abas[card.dataset.aba]);
+    const res = resumoAba(abas[card.dataset.aba] || []);
     card.querySelector('.stat-qtd').textContent = res.qtd;
     card.querySelector('.stat-total').textContent = brl(res.total);
   });
@@ -2245,6 +2539,14 @@ function bolCheca(){ $('bolBtnGo').disabled = !(bolArqBanco && bolArqSis); mostr
 ligaDrop('bolDropBanco','bolFileBanco','bolTxtBanco', f => { bolArqBanco = f; bolCheca(); });
 ligaDrop('bolDropSis','bolFileSis','bolTxtSis', f => { bolArqSis = f; bolCheca(); });
 
+// o período do relatório tem mais de um vencimento? (com a regra do fim de semana:
+// período que começa na segunda inclui o sábado e o domingo anteriores)
+function periodoTemVariasDatas(topo, titulos){
+  const per = periodoEfetivo(topo.periodo);
+  if(per) return per.fim > per.ini;
+  return new Set(titulos.map(t => formatData(t.venc)).filter(Boolean)).size > 1;
+}
+
 $('bolBtnGo').addEventListener('click', async () => {
   limpaErro('bolErro');
   try{
@@ -2262,15 +2564,17 @@ $('bolBtnGo').addEventListener('click', async () => {
     bolUltimo = { linhas, consulta: dataHoraConsultaItau(lB.matriz) };
 
     // checagens dos arquivos (mesma data, mesma empresa, período), antes do resultado
-    const checagens = checagensBoletos({ topo: topoSistemaBoletos(lS.matriz), consultaDda: bolUltimo.consulta,
-                                         conta: contaDoDdaItau(lB.matriz), dda, linhas });
-    $('bolChecagens').innerHTML = checagensHtml(checagens);
+    const topo = topoSistemaBoletos(lS.matriz);
+    const checagens = checagensBoletos({ topo, consultaDda: bolUltimo.consulta, conta: contaDoDdaItau(lB.matriz), dda, linhas });
+    $('bolChecagens').replaceChildren(...checagensDom(checagens));
 
+    bolUltimo.abas = montaAbasBol(linhas, { porData: periodoTemVariasDatas(topo, titulos) });
     const comCodigo = titulos.filter(t => t.temCodigo).length;
-    $('bolInfo').innerHTML =
-      `Consulta no Itaú: <b class="mono">${escapa(bolUltimo.consulta || 'data/hora não encontrada no arquivo')}</b> · ` +
-      `${dda.length} boletos no DDA · ${titulos.length} títulos no sistema (${comCodigo} já com código de barras)`;
-    bolUltimo.abas = montaAbasBol(linhas);
+    $('bolInfo').replaceChildren(
+      document.createTextNode('Consulta no Itaú: '),
+      cria('b', 'mono', bolUltimo.consulta || 'data/hora não encontrada no arquivo'),
+      document.createTextNode(` · ${dda.length} boletos no DDA · ${titulos.length} títulos no sistema ` +
+        `(${comCodigo} já com código de barras; ${bolUltimo.abas.jaConferidos} desses códigos conferem com o DDA e ficam fora das abas)`));
     bolAbaAtiva = 'ok';
     mostraAbasBol(bolUltimo.abas);
 
@@ -2287,7 +2591,7 @@ $('bolBtnReset').addEventListener('click', () => location.reload());
 /* ---------- Excel ---------- */
 const ARIAL = { name:'Arial', size:10 };
 
-// as 3 abas, com as mesmas colunas e cores da tela. NF, código de barras e linha
+// as 4 abas, com as mesmas colunas, faixas e cores da tela. NF, código de barras e linha
 // digitável vão como TEXTO (string + numFmt '@'), para não perder zero nem dígito.
 function planilhaBoletos(abas){
   const wb = new ExcelJS.Workbook();
@@ -2305,25 +2609,28 @@ function planilhaBoletos(abas){
     });
     cab.height = 20;
     abas[a.id].forEach(r => {
-      const valores = cols.map(c => {
+      const faixa = ehFaixa(r);
+      const valores = cols.map((c, i) => {
+        if(faixa) return i === 0 ? r.fornecedor : (c.id === 'valor' && r.valor !== null ? r.valor : '');
         if(c.id === 'valor') return r.valor;
         if(c.id === 'fornecedor') return r.status === 'consumo' ? `${r.fornecedor} — conta de consumo` : r.fornecedor;
         return String(r[c.id] || '');
       });
       const row = ws.addRow(valores);
-      const st = STATUS_BOL[r.status];
+      const st = faixa ? ESTILO_FAIXA[r.status] : STATUS_BOL[r.status];
       cols.forEach((c, i) => {
         const cel = row.getCell(i + 1);
-        cel.font = { ...ARIAL, bold: r.status === 'grupo', color:{ argb: st.texto } };
+        cel.font = { ...ARIAL, bold: r.status === 'grupo' || faixa, color:{ argb: st.texto } };
         cel.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: st.fundo } };
         cel.border = BORDA_FINA;
-        cel.alignment = { vertical:'top', wrapText: c.id === 'verificar' || c.id === 'fornecedor' };
-        if(c.texto) cel.numFmt = '@';
+        cel.alignment = { vertical:'top', wrapText: !faixa && (c.id === 'verificar' || c.id === 'fornecedor') };
+        if(c.texto && !(faixa && i === 0)) cel.numFmt = '@';
         if(c.id === 'valor'){ cel.numFmt = FMT_REAL; cel.alignment = { vertical:'top', horizontal:'right' }; }
       });
     });
     const res = resumoAba(abas[a.id]);
-    const tot = ws.addRow(cols.map(c => c.id === 'codForn' ? `Total · ${res.qtd} ${res.qtd === 1 ? 'item' : 'itens'}` : c.id === 'valor' ? res.total : ''));
+    const rotulo = `Total${abas.porData ? ' geral' : ''} · ${res.qtd} ${res.qtd === 1 ? 'item' : 'itens'}`;
+    const tot = ws.addRow(cols.map((c, i) => i === 0 ? rotulo : c.id === 'valor' ? res.total : ''));
     tot.eachCell({ includeEmpty:true }, (cel, i) => {
       cel.font = { ...ARIAL, bold:true };
       cel.border = BORDA_FINA;
@@ -2381,5 +2688,5 @@ $('bolBtnXlsx').addEventListener('click', async () => {
 
 // legenda de status na Ajuda (vem de STATUS_BOL: mesmo nome e cor da tela e do Excel)
 const legendaBol = $('ajudaBolStatus');
-if(legendaBol) legendaBol.innerHTML = Object.entries(STATUS_BOL).map(([id, st]) =>
-  `<li><span class="status st-${id}">${escapa(st.nome)}</span> ${escapa(st.ajuda)}</li>`).join('');
+if(legendaBol) legendaBol.replaceChildren(...Object.entries(STATUS_BOL).map(([id, st]) =>
+  criaCom('li', '', [cria('span', 'status st-' + id, st.nome), document.createTextNode(' ' + st.ajuda)])));

@@ -111,7 +111,7 @@ Grupos:
 
 ## Conferência de Boletos
 
-Você envia o **DDA do Itaú** e o relatório **"Duplicatas em Aberto Modelo A"** do sistema, da **mesma empresa** e do **mesmo dia**. Para cada título em aberto, a página acha o boleto no DDA e entrega a **linha digitável pronta para copiar**, só depois de conferir o código. O resultado vem em **3 abas**, iguais na tela e no Excel.
+Você envia o **DDA do Itaú** e o relatório **"Duplicatas em Aberto Modelo A"** do sistema, da **mesma empresa** e do **mesmo dia**. Para cada título em aberto, a página acha o boleto no DDA e entrega a **linha digitável pronta para copiar**, só depois de conferir o código. O resultado vem em **4 abas**, iguais na tela e no Excel.
 
 ### Arquivos esperados
 
@@ -123,18 +123,28 @@ Você envia o **DDA do Itaú** e o relatório **"Duplicatas em Aberto Modelo A"*
 ### Checagens dos arquivos (no topo, antes do resultado)
 
 - **Mesma data**: a Data/Hora da consulta do DDA e a do relatório têm que ser do mesmo dia; se não forem, aparece um aviso.
-- **Mesma empresa**: mostra o código da empresa do relatório e o nome/CNPJ do DDA. Se menos de **10%** dos boletos do DDA (dentro do período) casarem com o sistema, contando os códigos já lançados, aparece o alerta grande "Os arquivos podem ser de empresas diferentes".
-- **Período**: mostra o período do relatório e quantos boletos do DDA vencem fora dele. Se o período começa numa **segunda-feira**, os boletos de sábado e domingo anteriores entram também, com a data original.
+- **Mesma empresa**: mostra o código da empresa do relatório (célula A1, ex.: `5 = CRV Minas, filial 0004-35`, nomes em `EMPRESAS_SISTEMA`) e o nome/CNPJ do DDA. Se menos de **10%** dos boletos do DDA (dentro do período) casarem com o sistema, contando os códigos já lançados, aparece o alerta grande "Os arquivos podem ser de empresas diferentes".
+- **Período**: mostra o período do relatório e quantos boletos do DDA vencem fora dele. Se o período começa numa **segunda-feira**, os boletos de sábado e domingo anteriores entram também, com a data original. Se o período tem **mais de um vencimento**, a conferência é feita junta, mas cada aba (na tela e no Excel) é separada em **faixas por data** ("Vencimento 14/11/2026 (sábado)"), com o subtotal de cada data e o total geral no fim.
 
 As checagens só avisam: não mudam o resultado.
 
 ### Títulos que já têm código no sistema
 
-Ficam fora do pareamento. O código deles passa pelas mesmas conferências da linha digitável (abaixo) e é procurado no DDA:
+Ficam **fora da conferência**. Todo código digitado no sistema passa pelas mesmas conferências da linha digitável (abaixo) e é procurado no DDA:
 
-- válido e igual a um boleto do DDA: vai para **Com boleto**, marcado "código já lançado no sistema" (ou para a **Verificação**, se tiver algum aviso);
-- inválido, ilegível, repetido em dois títulos ou fora do DDA: vai para a **Verificação**, com "use o do DDA" e a linha correta do DDA quando houver. O código do sistema **nunca** é corrigido automaticamente;
-- conta de consumo (começa com 8): vai para **Sem boleto**, marcada "Conta de consumo".
+- válido e igual a um boleto do DDA: **OK**. O boleto fica "usado" e não entra mais na conferência; o título não aparece nas abas (só na contagem acima dos avisos), a não ser que tenha algum aviso (cedido, desconto, vencimento), aí vai para a **Verificação**;
+- conta de consumo (começa com 8): vai para **Sem boleto**, marcada "Conta de consumo";
+- qualquer outro caso: a página procura no DDA um boleto **livre** com o **mesmo valor** e com a NF no Nº Doc. ou nome parecido (preferência: 1º o Nº Doc. com a NF, 2º o vencimento do código igual ao do boleto). Esse boleto também fica "usado". O título vai para o **bloco vermelho no fim da Verificação** (status "Código do sistema"), com uma destas frases (`MSG_COD_SIS`):
+
+| Caso | Frase |
+| --- | --- |
+| código inválido (DV não fecha) ou ilegível | "Código digitado no sistema é INVÁLIDO. Use o código do DDA ao lado" (ou "… Peça o boleto ao fornecedor", se não achou boleto) |
+| código válido, boleto do DDA de **outro banco** | "Boleto trocado: confirme com o fornecedor qual é o válido. Não pague os dois." |
+| código válido, mesmo banco, outro número | "Código do sistema diferente do boleto do DDA. Use o do DDA e corrija o lançamento" |
+| código válido, nenhum boleto no DDA | "Código válido, mas não aparece no DDA. Confirme se o boleto ainda está em aberto." |
+| o mesmo código já está em outro título | "O mesmo código já está lançado em outro título do sistema…" |
+
+A linha digitável mostrada nesse bloco é sempre a do **boleto do DDA** (e só se ele passou nas travas). O código do sistema **nunca** é corrigido automaticamente.
 
 ### Regras de pareamento
 
@@ -143,7 +153,7 @@ Ficam fora do pareamento. O código deles passa pelas mesmas conferências da li
 - **Nome**: alguma palavra relevante em comum, comparando as **5 primeiras letras** de palavras com 4 letras ou mais. Não contam:
   - as palavras da lista fixa `PALAVRAS_IGNORADAS` (LTDA, SA, ME, EPP, EIRELI, COMERCIO, INDUSTRIA, BRASIL, PECAS, SERVICOS e palavras de ramo como ALIMENTOS, TRANSPORTES, MOTORES, TINTAS…), também comparadas pelas 5 primeiras letras, o que pega singular e plural;
   - as palavras **genéricas desta conferência**: uma palavra que aparece no nome de **3 ou mais fornecedores diferentes** do mesmo arquivo (por exemplo, o nome de uma cidade).
-- **NF**: o número da NF, sem zeros à esquerda e com **3 dígitos ou mais**, aparece nos dígitos do Nº Doc. do boleto. NF com 1 ou 2 dígitos não conta.
+- **NF**: o número da NF, sem zeros à esquerda e com **3 dígitos ou mais**, aparece no **começo** dos dígitos do Nº Doc. do boleto (sem zeros à esquerda; `nfNoDoc`). NF com 1 ou 2 dígitos não conta.
 - **Valor**: igual **ao centavo** ao "Até Venc." ou ao "A Pagar".
 
 Só o valor batendo **nunca** casa. Os pares são escolhidos do mais forte para o mais fraco (3 sinais antes de 2; no empate, o vencimento mais próximo). Cada título e cada boleto entram em um par só.
@@ -154,7 +164,11 @@ Só o valor batendo **nunca** casa. Os pares são escolhidos do mais forte para 
 - Dá preferência às notas cuja NF aparece no Nº Doc. do boleto.
 - Só agrupa quando a combinação é **a única**. Se houver mais de uma, ou notas demais para conferir, o boleto vai **sozinho** para a Verificação ("boleto agrupado ambíguo"), com as notas candidatas, e nenhuma nota é marcada como paga por ele.
 
-**3. O resto** é "Sem boleto" (título sem par) ou "Boleto no DDA sem título no sistema" (na Verificação).
+**3. Boleto que não fecha.** Se sobrou um boleto livre de um fornecedor (mesmas 5 primeiras letras) que tem títulos sem boleto, e a soma de **todos** esses títulos é diferente do boleto, o boleto vai para a Verificação: "Boleto de R$ X do fornecedor … não fecha com as N NFs do sistema (soma R$ Y, diferença R$ Z). O boleto deve incluir nota que não está no relatório; peça o demonstrativo." As NFs continuam em "Sem boleto".
+
+**4. O resto** é "Sem boleto" (título sem par) ou "DDA sem título no sistema" (boleto sem título).
+
+**Folha e impostos.** Títulos sem código cujo nome tem CONSIGNADO, INSS, FGTS, IRRF, FOLHA, DARF, SALARIO, PENSAO ALIMENT, CONTRIBUICAO SINDICAL, RESCIS, FERIAS ou 13 SALARIO (`TIPOS_FOLHA`) nunca vêm no DDA: ficam fora do pareamento e aparecem num bloco cinza no fim de "Sem boleto", uma linha por tipo (códigos, nome, quantidade de títulos e total), com subtotal.
 
 ### O que vai para a Verificação
 
@@ -164,14 +178,15 @@ Um par só fica em **Com boleto** se não tiver nenhum destes motivos. A coluna 
 | --- | --- |
 | Boleto único: a soma das N NFs abaixo dá R$ X. Pagar uma vez só. | boleto agrupado (linha azul, com as NFs logo abaixo) |
 | boleto agrupado ambíguo | mais de uma combinação de notas dá o valor do boleto |
-| título cedido a factoring/fundo | boleto em nome de outra empresa (3 primeiras letras do primeiro nome diferentes, ou o nome não bateu) com FOMENTO, FIDC, FUNDO, FACTORING, CRED…, COBRAN… ou SECURITIZ… |
+| título cedido a factoring/fundo | boleto em nome de outra empresa (3 primeiras letras do primeiro nome diferentes, ou o nome não bateu) com FOMENTO, FIDC, FUNDO, FACTORING, CRED…, COBRAN…, SECURITIZ… ou PAGAMENTOS |
 | confirmar se é o mesmo fornecedor | boleto em nome de outra empresa, sem essas palavras |
+| O boleto é da NF X e no sistema está NF Y; confirmar (pode ser erro de digitação) | casou por nome e valor, mas o Nº Doc. traz um número do mesmo tamanho da NF com só 1 dígito diferente (`umDigitoDiferente`) |
 | Desconto/abatimento: pagar R$ X | "A Pagar" diferente de "Até Venc." |
 | Valor diferente: boleto R$ X x sistema R$ Y | bateram NF e nome, mas não o valor, e não virou grupo |
 | vencimento do código diferente do DDA (boleto prorrogado?) | o vencimento gravado no código não é o "Venc." do DDA |
 | possível pagamento em duplicidade | mesmo fornecedor e mesmo valor em NFs diferentes, ou a mesma linha digitável em mais de um lugar (as notas de um mesmo boleto agrupado não contam) |
-| Boleto no DDA sem título no sistema | boleto que não casou com nenhum título |
-| código digitado no sistema … use o do DDA | código do sistema inválido, ilegível ou fora do DDA |
+| Boleto de R$ X do fornecedor não fecha com as N NFs do sistema | ver "Boleto que não fecha", acima |
+| frases do bloco "Código do sistema" | ver "Títulos que já têm código no sistema", acima (bloco vermelho no fim) |
 | Bloqueado | código do DDA reprovado nas travas abaixo |
 
 ### Travas de segurança da linha digitável
@@ -197,10 +212,13 @@ Mesmo assim: **na hora de pagar, confira no banco se o beneficiário e o valor b
 | Aba | Colunas | O que entra |
 | --- | --- | --- |
 | Com boleto | Cód. Fornecedor, Fornecedor, NF, Valor, Código de Barras, Linha Digitável | pares um para um sem nenhuma pendência, por fornecedor e NF, com total |
-| Verificação | as mesmas + O que verificar | agrupados (azul, com as NFs em azul claro logo abaixo, sem repetir a linha digitável), depois os casos a conferir (amarelo) e os bloqueados (vermelho) |
-| Sem boleto | Cód. Fornecedor, Fornecedor, NF, Valor | títulos sem boleto e contas de consumo, com total |
+| Verificação | as mesmas + O que verificar | agrupados (azul, com as NFs em azul claro logo abaixo, sem repetir a linha digitável), depois os casos a conferir (amarelo), os bloqueados (vermelho) e, por último, o bloco vermelho "Código do sistema" |
+| Sem boleto | Cód. Fornecedor, Fornecedor, NF, Valor | títulos sem boleto e contas de consumo, com total, e no fim o bloco "Folha e impostos (não vêm no DDA)" |
+| DDA sem título no sistema | Beneficiário, Nº Doc., Vencimento, Valor, Código de Barras, Linha Digitável, Observação | boletos do DDA que não casaram com nada, do maior valor para o menor |
 
-Os cartões de resumo mostram a quantidade e o valor de cada aba e servem para trocar de aba. Cada status tem um nome e uma cor, definidos só em `STATUS_BOL` no `app.js` e usados pela tela, pelo Excel (fonte Arial, uma aba por aba da tela) e pela legenda da Ajuda: Com boleto (verde), Boleto agrupado (azul), Compõe o boleto (azul claro), Verificar (amarelo), Bloqueado (vermelho), Sem boleto e Conta de consumo (cinza).
+Com mais de um vencimento no período, cada aba tem uma faixa por data com subtotal, e o total do rodapé vira o total geral. Tudo o que vem dos arquivos é mostrado com `textContent` (nunca `innerHTML`).
+
+Os cartões de resumo mostram a quantidade e o valor de cada aba e servem para trocar de aba. Cada status tem um nome e uma cor, definidos só em `STATUS_BOL` no `app.js` e usados pela tela, pelo Excel (fonte Arial, uma aba por aba da tela) e pela legenda da Ajuda: Com boleto (verde), Boleto agrupado (azul), Compõe o boleto (azul claro), Verificar (amarelo), Bloqueado e Código do sistema (vermelho), Sem boleto, Conta de consumo e Folha e impostos (cinza), Só no DDA (roxo).
 
 ---
 
@@ -217,9 +235,18 @@ O que é testado:
 - só o valor igual (nome e NF diferentes) → não casa;
 - NF de 2 dígitos dentro do Nº Doc. → não conta como sinal de NF;
 - beneficiário que é um fundo de investimento, com valor e NF iguais → Verificação, "título cedido";
-- Excel gerado e lido de volta → linha digitável igual à da tela.
+- Excel gerado e lido de volta → linha digitável igual à da tela;
+- NF no começo do Nº Doc. conta como sinal; no meio, não;
+- agrupado grande: 40 títulos e um boleto igual à soma de 25 deles → acha os 25;
+- boleto que não fecha: 3 títulos somando R$ 900,00 e um boleto de R$ 950,00 → aviso com diferença de R$ 50,00;
+- NF 256 com Nº Doc. "246" (nome e valor iguais) → Verificação, "um dígito diferente";
+- beneficiário com PAGAMENTOS → "título cedido";
+- código do sistema com DV inválido e boleto válido no DDA → bloco vermelho, sugerindo o código do DDA, sem alterar o código do sistema; e os casos "boleto trocado", "código diferente", "não aparece no DDA" e "código igual ao do DDA";
+- "EMPRESTIMO CONSIGNADO FOLHA" → bloco "Folha e impostos", não aparece um por um;
+- período com 2 vencimentos → faixas por data com subtotais (e o Excel confere);
+- nome com HTML vindo do arquivo → aparece como texto.
 
-As telas Santander, Itaú e Código de barras são conferidas à parte com os arquivos da pasta `EXEMPLOS/`, que têm dados reais e por isso ficam só no computador (ignorados pelo `.gitignore`).
+As telas Santander, Itaú e Código de barras são conferidas à parte com os arquivos da pasta `EXEMPLOS/`, que têm dados reais e por isso ficam só no computador (ignorados pelo `.gitignore`, assim como `*.xlsx`, `*.xls`, `*.pdf` e `*.RET`).
 
 ---
 

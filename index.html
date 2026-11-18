@@ -6,20 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Conferência DDA</title>
 
-<!-- Biblioteca SheetJS: lê arquivos .xlsx no navegador
-     integrity = hash de segurança (SRI): garante que o arquivo baixado do CDN
-     é exatamente o esperado, sem nenhuma alteração. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
         integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<!-- Biblioteca ExcelJS: gera os Excel de resultado já formatados -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"
         integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<!-- Fontes: IBM Plex Sans (texto) e IBM Plex Mono (valores, datas e documentos).
-     Sem internet, o navegador usa as fontes do sistema no lugar. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -29,7 +23,6 @@
 
 <body>
 
-<!-- Ícones de linha usados na página (desenhados uma vez, usados com <use>) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-banco" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5M4.5 10v8M9 10v8M15 10v8M19.5 10v8M3 20.5h18"/></symbol>
   <symbol id="i-predio" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="1.5"/><path d="M9 7.5h1.5M13.5 7.5H15M9 11.5h1.5M13.5 11.5H15M9 15.5h1.5M13.5 15.5H15M10.5 20.5v-2.5h3v2.5"/></symbol>
@@ -412,7 +405,7 @@
       <!-- checagens dos arquivos: mesma data, mesma empresa e período -->
       <div class="checagens" id="bolChecagens"></div>
 
-      <!-- as 3 abas: os cartões mostram quantidade e valor; clicar troca a aba -->
+      <!-- as 4 abas: os cartões mostram quantidade e valor; clicar troca a aba -->
       <div class="resumo resumo-abas" id="bolResumo">
         <div class="stat st-ok" data-aba="ok" data-ajuda="bolOk">
           <button type="button" class="stat-filtro" aria-pressed="true">
@@ -429,6 +422,12 @@
         <div class="stat st-sem" data-aba="sem" data-ajuda="bolSem">
           <button type="button" class="stat-filtro" aria-pressed="false">
             <span class="stat-nome"><span class="bolinha"></span>Sem boleto</span>
+            <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
+          </button>
+        </div>
+        <div class="stat st-dda" data-aba="dda" data-ajuda="bolDda">
+          <button type="button" class="stat-filtro" aria-pressed="false">
+            <span class="stat-nome"><span class="bolinha"></span>DDA sem título no sistema</span>
             <span class="stat-qtd">0</span><span class="stat-total">R$ 0,00</span>
           </button>
         </div>
@@ -596,20 +595,22 @@
           <li>Leia os <b>avisos do topo</b> antes de tudo:
             <ul>
               <li><b>Mesma data:</b> a data da consulta do DDA e a do relatório têm que ser do mesmo dia.</li>
-              <li><b>Mesma empresa:</b> mostra o código da empresa do relatório e o nome e CNPJ do DDA. Se quase nada bater (menos de 10%), aparece um alerta vermelho: confira a empresa do relatório antes de seguir.</li>
-              <li><b>Período:</b> mostra o período do relatório e quantos boletos do DDA vencem fora dele. Se o período começa numa segunda-feira, os boletos de sábado e domingo anteriores entram também (são pagos na segunda), com a data original.</li>
+              <li><b>Mesma empresa:</b> mostra o código da empresa do relatório (célula A1, ex.: 5 = CRV Minas, filial 0004-35) e o nome e CNPJ do DDA. Se quase nada bater (menos de 10%), aparece um alerta vermelho: confira a empresa do relatório antes de seguir.</li>
+              <li><b>Período:</b> mostra o período do relatório e quantos boletos do DDA vencem fora dele. Se o período começa numa segunda-feira, os boletos de sábado e domingo anteriores entram também (são pagos na segunda), com a data original. Quando o período tem mais de um vencimento, a conferência é feita junta, mas cada aba (e o Excel) é separada em <b>faixas por data</b>, com o subtotal de cada data e o total geral no fim.</li>
             </ul>
           </li>
-          <li>Clique nos cartões <b>Com boleto</b>, <b>Verificação</b> e <b>Sem boleto</b> para trocar de aba. Cada cartão mostra a quantidade e o valor da aba. A busca procura fornecedor, NF, valor ou parte do código dentro da aba aberta.</li>
+          <li>Clique nos cartões <b>Com boleto</b>, <b>Verificação</b>, <b>Sem boleto</b> e <b>DDA sem título no sistema</b> para trocar de aba. Cada cartão mostra a quantidade e o valor da aba. A busca procura fornecedor, NF, valor ou parte do código dentro da aba aberta.</li>
           <li>Para pagar, clique em <b>Copiar</b> ao lado da linha digitável e cole no banco. Ao lado da linha aparecem o banco, o valor e o vencimento lidos do próprio código.</li>
-          <li>Se quiser, clique em <b>Baixar resultado (Excel)</b>: as mesmas 3 abas, com as mesmas colunas e cores. Antes de liberar o download, a página relê o Excel e confere cada linha digitável com a da tela; se alguma estiver diferente, o download é cancelado.</li>
+          <li>Se quiser, clique em <b>Baixar resultado (Excel)</b>: as mesmas 4 abas, com as mesmas colunas, faixas e cores. Antes de liberar o download, a página relê o Excel e confere cada linha digitável com a da tela; se alguma estiver diferente, o download é cancelado.</li>
         </ol>
 
         <h3>O que cada aba quer dizer</h3>
         <ul>
-          <li><b>Com boleto:</b> títulos achados no DDA, um boleto para um título, sem nenhuma pendência e com o código conferido. Pode copiar a linha digitável e pagar.</li>
-          <li><b>Verificação:</b> tudo que precisa de atenção antes de pagar. Vem nesta ordem: primeiro os <b>boletos agrupados</b> (azul), depois os casos com algo a conferir (amarelo) e por último os <b>bloqueados</b> (vermelho). A coluna <b>“O que verificar”</b> diz o que fazer.</li>
-          <li><b>Sem boleto:</b> títulos do sistema que não têm boleto no DDA, e as contas de consumo (marcadas “Conta de consumo”).</li>
+          <li><b>Com boleto:</b> títulos sem código no sistema achados no DDA, um boleto para um título, sem nenhuma pendência e com o código conferido. Pode copiar a linha digitável e pagar.</li>
+          <li><b>Verificação:</b> tudo que precisa de atenção antes de pagar. Vem nesta ordem: primeiro os <b>boletos agrupados</b> (azul), depois os casos com algo a conferir (amarelo), os <b>bloqueados</b> (vermelho) e, por último, o bloco vermelho <b>“Código do sistema”</b>: títulos que já tinham código lançado, mas o código está errado, é de outro boleto ou não está no DDA. A coluna <b>“O que verificar”</b> diz o que fazer.</li>
+          <li><b>Sem boleto:</b> títulos do sistema que não têm boleto no DDA, e as contas de consumo (marcadas “Conta de consumo”). No fim vem o bloco cinza <b>“Folha e impostos (não vêm no DDA)”</b>: consignado, INSS, FGTS, IRRF, DARF, folha, salário, pensão, contribuição sindical, rescisão, férias e 13º, somados por tipo (uma linha por tipo, com a quantidade de títulos e o total).</li>
+          <li><b>DDA sem título no sistema:</b> boletos do DDA que não casaram com nenhum título, do maior valor para o menor. Veja se falta lançar a nota. Se ninguém reconhecer o boleto, não pague.</li>
+          <li>Títulos que <b>já têm código no sistema</b> ficam fora da conferência: o código só é conferido. Se ele é igual ao do DDA, está tudo certo e o título não aparece nas abas (a contagem fica na linha de cima dos avisos); se não, vai para o bloco “Código do sistema”.</li>
         </ul>
 
         <h3>Status e cores</h3>
@@ -620,14 +621,19 @@
         <ul>
           <li><b>“Boleto único: a soma das N NFs abaixo dá R$ X. Pagar uma vez só.”</b> Um boleto paga várias notas do mesmo fornecedor. Pague esse boleto <b>uma vez só</b>: as NFs logo abaixo (“compõe o boleto acima”) já estão nele.</li>
           <li><b>“boleto agrupado ambíguo”</b> ou <b>“notas demais para conferir a soma”</b>: mais de uma combinação de notas dá o valor do boleto. Veja no boleto (ou com o fornecedor) quais notas ele paga. Nenhuma nota foi marcada como paga por ele.</li>
-          <li><b>“título cedido a factoring/fundo”</b>: o boleto está em nome de uma factoring, fundo, securitizadora ou cobradora. Confirme com o fornecedor que a cobrança foi mesmo passada para essa empresa antes de pagar.</li>
+          <li><b>“Boleto de R$ X do fornecedor não fecha com as N NFs do sistema”</b>: sobrou um boleto do fornecedor e a soma das notas dele sem boleto é diferente. O boleto deve incluir nota que não está no relatório: peça o demonstrativo. As NFs continuam em “Sem boleto”.</li>
+          <li><b>“O boleto é da NF X e no sistema está NF Y”</b>: nome e valor batem, mas o Nº Doc. do boleto tem um número com 1 dígito diferente da NF. Pode ser erro de digitação: confirme qual é a NF certa.</li>
+          <li><b>“título cedido a factoring/fundo”</b>: o boleto está em nome de uma factoring, fundo, securitizadora, cobradora ou instituição de pagamentos. Confirme com o fornecedor que a cobrança foi mesmo passada para essa empresa antes de pagar.</li>
           <li><b>“confirmar se é o mesmo fornecedor”</b>: o boleto está em nome de outra empresa. Confira o CNPJ e confirme com o fornecedor.</li>
           <li><b>“Desconto/abatimento: pagar R$ X”</b>: o boleto tem um valor menor (desconto ou abatimento). Confira o valor e o prazo antes de pagar.</li>
           <li><b>“Valor diferente: boleto R$ X x sistema R$ Y”</b>: NF e fornecedor batem, mas o valor não. Veja se o lançamento está errado ou peça o boleto certo.</li>
           <li><b>“vencimento do código diferente do DDA (boleto prorrogado?)”</b>: o vencimento gravado no código não é o do DDA. Confirme a data com o fornecedor.</li>
           <li><b>“possível pagamento em duplicidade”</b>: o mesmo fornecedor e o mesmo valor em NFs diferentes, ou a mesma linha digitável em mais de um lugar. Confirme que não são o mesmo boleto antes de pagar os dois.</li>
-          <li><b>“Boleto no DDA sem título no sistema”</b>: veja se falta lançar a nota. Se ninguém reconhecer o boleto, não pague.</li>
-          <li><b>“código digitado no sistema … é inválido / não está no DDA / ilegível; use o do DDA”</b>: o código lançado no sistema está errado. Corrija no sistema usando a linha digitável do DDA que aparece na mesma linha. A página <b>nunca</b> corrige o código do sistema sozinha.</li>
+          <li><b>“Código digitado no sistema é INVÁLIDO. Use o código do DDA ao lado”</b> (ou <b>“Peça o boleto ao fornecedor”</b>, se não houver boleto no DDA): o código lançado não fecha os dígitos verificadores. Corrija o lançamento no sistema.</li>
+          <li><b>“Boleto trocado: confirme com o fornecedor qual é o válido. Não pague os dois.”</b>: o código do sistema é válido, mas o boleto do DDA com o mesmo valor é de outro banco. Ligue para o fornecedor antes de pagar.</li>
+          <li><b>“Código do sistema diferente do boleto do DDA. Use o do DDA e corrija o lançamento”</b>: mesmo banco, outro número. Corrija o lançamento.</li>
+          <li><b>“Código válido, mas não aparece no DDA. Confirme se o boleto ainda está em aberto.”</b>: pode ter sido pago, baixado ou substituído.</li>
+          <li>Nesses casos do código do sistema, a página <b>nunca</b> corrige o código sozinha: quem corrige é você, no sistema.</li>
           <li><b>Bloqueado</b> (vermelho): o código do DDA não passou na conferência (tamanho, dígitos verificadores, banco, valor, ou ficou ilegível no Excel). Não há linha digitável para copiar: peça o boleto certo ao fornecedor ou consulte o boleto direto no banco.</li>
         </ul>
 
